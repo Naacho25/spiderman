@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Trepamuros - Swing entre edificios</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #0a0612; font-family: 'Segoe UI', Arial, sans-serif;
+    height: 100%; width: 100%;
+  }
+  canvas { display: block; touch-action: none; cursor: crosshair; }
+
+  #hud {
+    position: fixed; top: 14px; left: 18px; color: #fff;
+    font-size: 22px; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.6);
+    letter-spacing: .5px; user-select: none; pointer-events: none; display: none;
+  }
+  #hud span { color: #ffd166; }
+
+  #hint {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,.75); font-size: 14px; text-align: center;
+    user-select: none; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,.7); display: none;
+  }
+
+  #overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; background: rgba(6,4,14,.72); backdrop-filter: blur(2px);
+    color: #fff; text-align: center; opacity: 0; pointer-events: none; transition: opacity .25s;
+  }
+  #overlay.show { opacity: 1; pointer-events: all; }
+  #overlay h1 { font-size: 40px; margin: 0 0 6px; letter-spacing: 1px; }
+  #overlay p { font-size: 17px; margin: 4px 0 20px; color: #ccc; }
+  #overlay p span { color: #ffd166; font-weight: 700; }
+  #restartBtn {
+    background: #ff5d5d; color: #fff; border: none; padding: 12px 30px;
+    font-size: 17px; font-weight: 700; border-radius: 30px; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(255,93,93,.4); transition: transform .1s;
+  }
+  #restartBtn:active { transform: scale(0.95); }
+
+  #startOverlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; background: rgba(6,4,14,.85);
+    color: #fff; text-align: center; z-index: 5;
+  }
+  #startOverlay h1 { font-size: 34px; margin-bottom: 4px; }
+  #startOverlay p { color: #bbb; max-width: 380px; line-height: 1.5; font-size: 15px; }
+  #startBtn {
+    background: #4dd0e1; color: #08202a; border: none; padding: 13px 34px;
+    font-size: 17px; font-weight: 800; border-radius: 30px; cursor: pointer; margin-top: 18px;
+  }
+  #skinPicker {
+    display: flex; gap: 16px; margin-top: 20px; flex-wrap: wrap;
+    justify-content: center; max-width: 380px;
+  }
+  .skin-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .skin-swatch {
+    width: 48px; height: 48px; border-radius: 50%; cursor: pointer;
+    border: 3px solid transparent; box-shadow: 0 3px 10px rgba(0,0,0,.5);
+    transition: transform .12s, border-color .15s;
+  }
+  .skin-swatch:hover { transform: scale(1.06); }
+  .skin-swatch.selected { border-color: #fff; transform: scale(1.1); }
+  .skin-label { font-size: 11px; color: #bbb; }
+  .skin-label.selected { color: #fff; font-weight: 700; }
+
+  #achievementsBtn {
+    background: transparent; color: #ffd166; border: 2px solid #ffd166;
+    padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
+    cursor: pointer; margin-top: 14px;
+  }
+  #achievementsOverlay {
+    position: fixed; inset: 0; background: rgba(6,4,14,.97); z-index: 6;
+    display: none; flex-direction: column; align-items: center;
+    padding: 36px 20px 24px; overflow-y: auto; color: #fff; text-align: center;
+  }
+  #achievementsOverlay.show { display: flex; }
+  #achievementsOverlay h2 { font-size: 26px; margin: 0 0 4px; }
+  #achievementsOverlay .ach-sub { color: #999; font-size: 13px; margin-bottom: 18px; }
+  #achievementsList { max-width: 440px; width: 100%; }
+  .ach-group { margin-bottom: 16px; text-align: left; }
+  .ach-group h3 { font-size: 14px; color: #ffd166; margin: 0 0 8px; }
+  .ach-row {
+    display: flex; gap: 12px; align-items: center; padding: 8px 10px;
+    border-radius: 10px; background: rgba(255,255,255,.04); margin-bottom: 6px; opacity: .5;
+  }
+  .ach-row.unlocked { opacity: 1; background: rgba(255,209,102,.14); }
+  .ach-icon { font-size: 20px; flex-shrink: 0; }
+  .ach-name { font-size: 14px; font-weight: 700; }
+  .ach-desc { font-size: 12px; color: #aaa; }
+  #closeAchievements {
+    margin-top: 8px; background: #ffd166; color: #3a2400; border: none;
+    padding: 11px 30px; border-radius: 24px; font-weight: 800; cursor: pointer;
+  }
+
+  #pauseBtn {
+    position: fixed; top: 14px; right: 18px; width: 42px; height: 42px;
+    border-radius: 50%; background: rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.5);
+    color: #fff; font-size: 18px; display: none; align-items: center; justify-content: center;
+    cursor: pointer; z-index: 4;
+  }
+  #pauseOverlay {
+    position: fixed; inset: 0; background: rgba(6,4,14,.85); z-index: 7;
+    display: none; align-items: center; justify-content: center; flex-direction: column;
+    color: #fff; text-align: center;
+  }
+  #pauseOverlay.show { display: flex; }
+  #pauseOverlay h2 { font-size: 30px; margin: 0 0 22px; }
+  #pauseOverlay button {
+    display: block; width: 220px; margin: 7px 0; padding: 12px 0;
+    border-radius: 26px; border: none; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  #resumeBtn { background: #4dd0e1; color: #08202a; }
+  #restartFromPauseBtn { background: rgba(255,255,255,.12); color: #fff; }
+  #menuBtn { background: rgba(255,255,255,.12); color: #fff; }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="hud">🏙 <span id="score">0</span> m &nbsp; | &nbsp; 🏆 <span id="best">0</span> m &nbsp; <span id="lifeIndicator" style="display:none">💫</span></div>
+<div id="hint">Tocá para saltar y engancharte · Movete para los costados mientras estás colgado para tomar más impulso · 🚀 salto, 🕊️ planeo, 💫 rebote extra · Esquivá al villano volador</div>
+<button id="pauseBtn">⏸</button>
+
+<div id="pauseOverlay">
+  <h2>⏸ Pausa</h2>
+  <button id="resumeBtn">Continuar</button>
+  <button id="restartFromPauseBtn">Reiniciar</button>
+  <button id="menuBtn">Menú principal</button>
+</div>
+
+<div id="overlay">
+  <h1>💥 Tocaste el piso</h1>
+  <p>Distancia recorrida: <span id="finalScore">0</span> m</p>
+  <button id="restartBtn">Reintentar</button>
+</div>
+
+<div id="startOverlay">
+  <h1>🕸️ Trepamuros</h1>
+  <p>Colgate de edificio en edificio con tu telaraña. Apuntá con el mouse (o el dedo) a una pared y mantené presionado para engancharte. Si tocás la calle, se acabó.</p>
+  <div id="skinPicker"></div>
+  <button id="startBtn">Jugar</button>
+  <button id="achievementsBtn">🏆 Logros</button>
+</div>
+
+<div id="achievementsOverlay">
+  <h2>🏆 Logros</h2>
+  <div class="ach-sub">Se guardan solos entre partidas</div>
+  <div id="achievementsList"></div>
+  <button id="closeAchievements">Volver</button>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize(){ W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+// ---------- estado global ----------
+const GRAVITY = 0.42;
+const DAMPING = 0.997;
+const AIR_CONTROL = 0.34;
+const MAX_WEB = 520;
+const JUMP_VY = -12;
+const GLIDE_MAX_SPEED = 4.5;
+
+let groundY, cameraX, buildings, powerUps, enemies, player, web, keys, score, best = 0, running = false, gameOver = false;
+let startBuilding, canLand, pickupMsg = null, pumpVel = 0, sessionMaxHeightPx = 0, paused = false;
+
+// ---------- skins ----------
+const SKINS = [
+  { id:'classic', name:'Clásico',  torso:'#e0262c', accent:'#1b3fa0', legs:'#1b3fa0', mask:'#141824', eyeGlow:false },
+  { id:'noir',    name:'Nocturno', torso:'#202024', accent:'#4a4a54', legs:'#111114', mask:'#0a0a0c', eyeGlow:true,  eyeColor:'#ffffff' },
+  { id:'tech',    name:'Dorado',   torso:'#a8262c', accent:'#d4af37', legs:'#2b2b2b', mask:'#5c1418', eyeGlow:true,  eyeColor:'#ffd76a' },
+  { id:'future',  name:'Blanco',   torso:'#e9e9ec', accent:'#c0272d', legs:'#c0272d', mask:'#1c1c22', eyeGlow:false },
+  { id:'stealth', name:'Sigilo',   torso:'#1c2b45', accent:'#2f4a73', legs:'#0f1a2b', mask:'#0c1420', eyeGlow:true,  eyeColor:'#4dd0e1' },
+];
+let selectedSkin = 0;
+
+function renderSkinPicker(){
+  const el = document.getElementById('skinPicker');
+  el.innerHTML = '';
+  SKINS.forEach((s, i) => {
+    const item = document.createElement('div');
+    item.className = 'skin-item';
+    const swatch = document.createElement('div');
+    swatch.className = 'skin-swatch' + (i === selectedSkin ? ' selected' : '');
+    swatch.style.background = `linear-gradient(135deg, ${s.torso} 55%, ${s.legs} 55%)`;
+    swatch.addEventListener('click', () => { selectedSkin = i; renderSkinPicker(); });
+    const label = document.createElement('div');
+    label.className = 'skin-label' + (i === selectedSkin ? ' selected' : '');
+    label.textContent = s.name;
+    item.appendChild(swatch);
+    item.appendChild(label);
+    el.appendChild(item);
+  });
+}
+renderSkinPicker();
+
+// ---------- logros (persistidos entre partidas) ----------
+let stats = {
+  bestDistance: 0, bestHeight: 0, totalPowerUps: 0,
+  totalEnemiesAvoided: 0, extraLifeUses: 0, skinsUsed: []
+};
+
+function loadStats(){
+  try {
+    const raw = localStorage.getItem('trepamuros_stats');
+    if (raw) stats = Object.assign(stats, JSON.parse(raw));
+  } catch (e) { /* almacenamiento local no disponible en este entorno */ }
+  renderAchievements();
+}
+function saveStats(){
+  try { localStorage.setItem('trepamuros_stats', JSON.stringify(stats)); }
+  catch (e) { console.error('No se pudo guardar el progreso', e); }
+}
+
+const ACHIEVEMENTS = [
+  { id:'dist_100', category:'distancia', name:'Corredor urbano', desc:'Recorré 100 m en una partida', check: s => s.bestDistance >= 100 },
+  { id:'dist_500', category:'distancia', name:'Maratón de azotea', desc:'Recorré 500 m en una partida', check: s => s.bestDistance >= 500 },
+  { id:'dist_1500', category:'distancia', name:'Leyenda de la ciudad', desc:'Recorré 1500 m en una partida', check: s => s.bestDistance >= 1500 },
+
+  { id:'height_30', category:'altura', name:'Primeros pasos en el aire', desc:'Llegá a 30 m de altura', check: s => s.bestHeight >= 30 },
+  { id:'height_60', category:'altura', name:'Vértigo', desc:'Llegá a 60 m de altura', check: s => s.bestHeight >= 60 },
+  { id:'height_100', category:'altura', name:'Rozando las nubes', desc:'Llegá a 100 m de altura', check: s => s.bestHeight >= 100 },
+
+  { id:'power_5', category:'powerups', name:'Primeros poderes', desc:'Agarrá 5 power-ups en total', check: s => s.totalPowerUps >= 5 },
+  { id:'power_25', category:'powerups', name:'Coleccionista', desc:'Agarrá 25 power-ups en total', check: s => s.totalPowerUps >= 25 },
+  { id:'power_75', category:'powerups', name:'Acumulador experto', desc:'Agarrá 75 power-ups en total', check: s => s.totalPowerUps >= 75 },
+
+  { id:'dodge_5', category:'enemigos', name:'Esquivador novato', desc:'Esquivá 5 enemigos', check: s => s.totalEnemiesAvoided >= 5 },
+  { id:'dodge_20', category:'enemigos', name:'Reflejos arácnidos', desc:'Esquivá 20 enemigos', check: s => s.totalEnemiesAvoided >= 20 },
+  { id:'dodge_50', category:'enemigos', name:'Maestro esquivador', desc:'Esquivá 50 enemigos', check: s => s.totalEnemiesAvoided >= 50 },
+
+  { id:'skins_all', category:'extra', name:'Guardarropa completo', desc:'Probá los 5 trajes disponibles', check: s => (s.skinsUsed||[]).length >= SKINS.length },
+  { id:'extralife', category:'extra', name:'Segunda oportunidad', desc:'Usá un rebote de vida extra', check: s => s.extraLifeUses >= 1 },
+];
+
+function renderAchievements(){
+  const list = document.getElementById('achievementsList');
+  if (!list) return;
+  const categories = {
+    distancia: '📏 Distancia', altura: '🪂 Altura', powerups: '✨ Power-ups',
+    enemigos: '🕵️ Enemigos esquivados', extra: '🌟 Especiales'
+  };
+  list.innerHTML = '';
+  Object.keys(categories).forEach(catKey => {
+    const group = document.createElement('div');
+    group.className = 'ach-group';
+    const h = document.createElement('h3');
+    h.textContent = categories[catKey];
+    group.appendChild(h);
+    ACHIEVEMENTS.filter(a => a.category === catKey).forEach(a => {
+      const unlocked = a.check(stats);
+      const row = document.createElement('div');
+      row.className = 'ach-row' + (unlocked ? ' unlocked' : '');
+      row.innerHTML =
+        '<span class="ach-icon">' + (unlocked ? '🏅' : '🔒') + '</span>' +
+        '<div><div class="ach-name">' + a.name + '</div><div class="ach-desc">' + a.desc + '</div></div>';
+      group.appendChild(row);
+    });
+    list.appendChild(group);
+  });
+}
+
+document.getElementById('achievementsBtn').addEventListener('click', () => {
+  renderAchievements();
+  document.getElementById('achievementsOverlay').classList.add('show');
+});
+document.getElementById('closeAchievements').addEventListener('click', () => {
+  document.getElementById('achievementsOverlay').classList.remove('show');
+});
+loadStats();
+
+function initGame(){
+  groundY = H - 70;
+  cameraX = 0;
+  score = 0;
+  sessionMaxHeightPx = 0;
+  buildings = [];
+  powerUps = [];
+  enemies = [];
+  web = { active:false, anchor:null, len:0 };
+  keys = { left:false, right:false };
+  pumpVel = 0;
+
+  if (!stats.skinsUsed.includes(SKINS[selectedSkin].id)){
+    stats.skinsUsed.push(SKINS[selectedSkin].id);
+    saveStats();
+  }
+
+  // primer edificio, plataforma segura
+  buildings.push({ x:-100, width:340, height:H*0.42 });
+  let lastEnd = 240;
+  while (lastEnd < W*2){
+    const gap = 60 + Math.random()*100;
+    const width = 110 + Math.random()*170;
+    const height = H*(0.26 + Math.random()*0.44);
+    const x = lastEnd + gap;
+    buildings.push({ x, width, height });
+    lastEnd = x + width;
+  }
+
+  const first = buildings[0];
+  startBuilding = first;
+  canLand = true;
+  player = {
+    x: first.x + first.width/2, y: groundY - first.height - 14,
+    px: 0, py: 0, radius: 14, grounded: true, facing: 1, gliding: false, glideTimer: 0, extraLife: false
+  };
+  player.px = player.x; player.py = player.y;
+  updateLifeHud();
+
+  gameOver = false;
+  document.getElementById('overlay').classList.remove('show');
+}
+
+function ensureBuildings(){
+  let last = buildings[buildings.length-1];
+  while (last.x + last.width < cameraX + W + 500){
+    const gap = 60 + Math.random()*110;
+    const width = 110 + Math.random()*180;
+    const height = H*(0.24 + Math.random()*0.44);
+    const x = last.x + last.width + gap;
+    const b = { x, width, height };
+    buildings.push(b);
+    last = b;
+  }
+  // limpiar edificios muy atrás
+  buildings = buildings.filter(b => b.x + b.width > cameraX - 300);
+}
+
+const POWERUP_TYPES = ['jump', 'glide', 'life'];
+
+function ensurePowerUps(){
+  let lastX = powerUps.length ? powerUps[powerUps.length-1].x : 500;
+  while (lastX < cameraX + W + 700){
+    lastX += 420 + Math.random()*340;
+    const type = POWERUP_TYPES[Math.floor(Math.random()*POWERUP_TYPES.length)];
+    const y = groundY - (160 + Math.random()*H*0.45);
+    powerUps.push({ x:lastX, y, type });
+  }
+  powerUps = powerUps.filter(p => p.x > cameraX - 200);
+}
+
+function applyPowerUp(type){
+  web.active = false;
+  if (type === 'jump'){
+    player.px = player.x - 15;
+    player.py = player.y + 19;
+    pickupMsg = { text: '¡Súper salto! 🚀', timer: 70 };
+  } else if (type === 'glide'){
+    player.gliding = true;
+    player.glideTimer = 160;
+    pickupMsg = { text: '¡Planeando! 🕊️', timer: 70 };
+  } else if (type === 'life'){
+    player.extraLife = true;
+    pickupMsg = { text: '¡Vida extra conseguida! 💫', timer: 70 };
+    updateLifeHud();
+  }
+}
+
+function updateLifeHud(){
+  const el = document.getElementById('lifeIndicator');
+  if (el) el.style.display = player.extraLife ? 'inline' : 'none';
+}
+
+// enemigo volador: aparece poco seguido, hay que esquivarlo
+function ensureEnemies(){
+  let lastX = enemies.length ? enemies[enemies.length-1].x : 1400;
+  while (lastX < cameraX + W + 900){
+    lastX += 1500 + Math.random()*1100; // bastante espaciados
+    const y = groundY - (180 + Math.random()*H*0.4);
+    enemies.push({ x:lastX, y, baseY:y, phase: Math.random()*10, hit:false, counted:false });
+  }
+  // contar como "esquivado" el que quedó atrás sin chocar, antes de sacarlo de la lista
+  for (const en of enemies){
+    if (!en.hit && !en.counted && en.x < cameraX - 250){
+      en.counted = true;
+      stats.totalEnemiesAvoided++;
+      saveStats();
+    }
+  }
+  enemies = enemies.filter(en => en.x > cameraX - 500);
+}
+
+function buildingAt(worldX, worldY){
+  const pad = 16; // margen de tolerancia para que sea más fácil apuntar
+  for (const b of buildings){
+    if (worldX >= b.x - pad && worldX <= b.x + b.width + pad &&
+        worldY >= groundY - b.height - pad && worldY <= groundY){
+      return b;
+    }
+  }
+  return null;
+}
+
+// ---------- input ----------
+function worldFromClient(clientX, clientY){
+  return { x: clientX + cameraX, y: clientY };
+}
+
+// busca el mejor punto de enganche hacia adelante: prioriza altura (más arco de swing)
+// y avance, no solo la cercanía cruda — clave cuando los edificios son bajitos
+function findAutoAnchor(){
+  let best = null, bestScore = -Infinity;
+  for (const b of buildings){
+    if (b.x + b.width < player.x - 20) continue; // ignorar edificios ya pasados
+    const top = groundY - b.height;
+    const anchorX = Math.max(b.x, Math.min(player.x + 40, b.x + b.width));
+    const anchor = { x: anchorX, y: top };
+    const dist = Math.hypot(anchor.x - player.x, anchor.y - player.y);
+    if (dist > MAX_WEB || dist < 20) continue;
+
+    const heightGain = Math.max(0, player.y - anchor.y); // cuánto más alto, más arco de swing
+    const forwardness = Math.min(anchor.x - player.x, 260); // preferimos ir hacia adelante
+    let score = heightGain * 2.6 + forwardness * 0.6 + dist * 0.15;
+    if (heightGain < 50) score -= 180; // penalizar fuerte los anclajes "flacos" cerca del piso
+    if (score > bestScore){ bestScore = score; best = anchor; }
+  }
+  return best;
+}
+
+function tryShootWeb(clientX, clientY, allowAuto){
+  const p = worldFromClient(clientX, clientY);
+  const dx = p.x - player.x, dy = p.y - player.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist <= MAX_WEB && dist >= 10 && buildingAt(p.x, p.y)){
+    web.active = true;
+    web.anchor = { x: p.x, y: p.y };
+    web.len = dist;
+    player.grounded = false;
+    player.gliding = false;
+    return;
+  }
+  if (allowAuto){
+    const anchor = findAutoAnchor();
+    if (anchor){
+      web.active = true;
+      web.anchor = anchor;
+      web.len = Math.hypot(anchor.x - player.x, anchor.y - player.y);
+      player.grounded = false;
+      player.gliding = false;
+    }
+  }
+}
+function releaseWeb(){ web.active = false; }
+
+let pointerDown = false;
+canvas.addEventListener('pointerdown', e => {
+  pointerDown = true;
+  if (player.grounded){
+    // se deja caer del edificio, sin impulso: la física de caída libre hace el resto
+    player.grounded = false;
+    canLand = false;
+  }
+  tryShootWeb(e.clientX, e.clientY, true);
+});
+addEventListener('pointerup', () => { pointerDown = false; releaseWeb(); });
+addEventListener('pointermove', e => {
+  if (pointerDown) { /* mantiene el web actual, no reapunta hasta soltar */ }
+  mouseX = e.clientX; mouseY = e.clientY;
+});
+let mouseX = W/2, mouseY = H/2;
+let prevMouseX = mouseX;
+
+addEventListener('keydown', e => {
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+  if (e.code === 'Space' || e.code === 'ArrowUp'){
+    if (player.grounded){
+      player.py = player.y - JUMP_VY;
+      player.grounded = false;
+      canLand = false;
+    }
+  }
+  if (e.code === 'Enter' && gameOver) restart();
+  if ((e.code === 'Escape' || e.code === 'KeyP') && !gameOver) togglePause();
+});
+addEventListener('keyup', e => {
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+});
+
+document.getElementById('restartBtn').addEventListener('click', restart);
+document.getElementById('startBtn').addEventListener('click', () => {
+  document.getElementById('startOverlay').style.display = 'none';
+  document.getElementById('hud').style.display = '';
+  document.getElementById('hint').style.display = '';
+  document.getElementById('pauseBtn').style.display = 'flex';
+  paused = false;
+  initGame();
+  if (!running){ running = true; requestAnimationFrame(loop); }
+});
+
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
+document.getElementById('resumeBtn').addEventListener('click', togglePause);
+document.getElementById('restartFromPauseBtn').addEventListener('click', () => {
+  paused = false;
+  document.getElementById('pauseOverlay').classList.remove('show');
+  restart();
+});
+document.getElementById('menuBtn').addEventListener('click', showMenu);
+
+function togglePause(){
+  if (gameOver) return;
+  paused = !paused;
+  document.getElementById('pauseOverlay').classList.toggle('show', paused);
+}
+
+function showMenu(){
+  paused = false;
+  gameOver = true; // congela la física mientras se ve el menú
+  document.getElementById('pauseOverlay').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('hint').style.display = 'none';
+  document.getElementById('pauseBtn').style.display = 'none';
+  document.getElementById('startOverlay').style.display = 'flex';
+  renderSkinPicker();
+}
+
+function restart(){
+  initGame();
+}
+
+// ---------- física / update ----------
+function update(){
+  if (gameOver) return;
+
+  let vx = player.x - player.px;
+  let vy = player.y - player.py;
+  player.px = player.x;
+  player.py = player.y;
+
+  vx *= DAMPING; vy *= DAMPING;
+
+  let ax = 0, ay = GRAVITY;
+  if (!web.active && !player.grounded){
+    if (keys.left) ax -= AIR_CONTROL;
+    if (keys.right) ax += AIR_CONTROL;
+  }
+  if (player.grounded){
+    ay = 0; vy = 0;
+    if (keys.left) player.x -= 4;
+    if (keys.right) player.x += 4;
+  }
+  if (player.gliding && !player.grounded){
+    ay = GRAVITY * 0.22;
+    ax += 0.18; // empuje suave, no aceleración descontrolada
+    // tope de velocidad horizontal para que el planeo sea lento y manejable
+    vx = Math.max(-GLIDE_MAX_SPEED, Math.min(GLIDE_MAX_SPEED, vx));
+    player.glideTimer--;
+    if (player.glideTimer <= 0) player.gliding = false;
+  }
+
+  // "bombeo" del swing: mover el mouse/dedo para los costados mientras estás colgado
+  // suma impulso lateral, útil para tomar velocidad cuando quedás medio trabado
+  // "bombeo" del swing: suavizado con inercia propia, para que un cambio de dirección
+  // del mouse frene gradualmente en vez de revertir el movimiento de golpe
+  if (web.active && pointerDown){
+    const mouseDX = mouseX - prevMouseX;
+    const target = Math.max(-7, Math.min(7, mouseDX)) * 0.22;
+    pumpVel += (target - pumpVel) * 0.12;
+  } else {
+    pumpVel *= 0.9; // se apaga solo al soltar o cuando no está colgado
+  }
+  ax += pumpVel;
+  prevMouseX = mouseX;
+
+  player.x += vx + ax;
+  player.y += vy + ay;
+
+  if (vx > 0.05) player.facing = 1;
+  if (vx < -0.05) player.facing = -1;
+
+  // restricción de la telaraña (verlet constraint)
+  if (web.active){
+    const dx = player.x - web.anchor.x;
+    const dy = player.y - web.anchor.y;
+    const dist = Math.hypot(dx, dy) || 0.0001;
+    const diff = (dist - web.len) / dist;
+    player.x -= dx * diff;
+    player.y -= dy * diff;
+  }
+
+  // altura máxima alcanzada en esta partida (para el logro de altura)
+  sessionMaxHeightPx = Math.max(sessionMaxHeightPx, groundY - player.y);
+
+  // recolectar power-ups flotantes
+  for (let i = powerUps.length - 1; i >= 0; i--){
+    const p = powerUps[i];
+    if (Math.hypot(player.x - p.x, player.y - p.y) < player.radius + 17){
+      applyPowerUp(p.type);
+      powerUps.splice(i, 1);
+      stats.totalPowerUps++;
+      saveStats();
+    }
+  }
+  if (pickupMsg){
+    pickupMsg.timer--;
+    if (pickupMsg.timer <= 0) pickupMsg = null;
+  }
+
+  // movimiento del enemigo (hover con leve desplazamiento) y choque
+  const t = Date.now() / 1000;
+  for (const en of enemies){
+    en.y = en.baseY + Math.sin(t*0.8 + en.phase) * 26;
+    en.drawX = en.x + Math.sin(t*0.5 + en.phase) * 40;
+    if (!en.hit && Math.hypot(player.x - en.drawX, player.y - en.y) < player.radius + 15){
+      en.hit = true;
+      if (player.extraLife){
+        player.extraLife = false;
+        stats.extraLifeUses++;
+        saveStats();
+        player.py = player.y + 24;
+        player.px = player.x - 12;
+        pickupMsg = { text: '¡Esquive de emergencia! 💫', timer: 70 };
+        updateLifeHud();
+      } else {
+        triggerGameOver();
+      }
+    }
+  }
+
+  // colisión con el techo del edificio inicial (único lugar donde se puede aterrizar)
+  player.grounded = false;
+  if (canLand){
+    const b = startBuilding;
+    const top = groundY - b.height;
+    const withinX = player.x + player.radius*0.6 > b.x && player.x - player.radius*0.6 < b.x + b.width;
+    if (withinX && player.y + player.radius >= top && player.y + player.radius <= top + 22 && (player.y - player.py) >= -1){
+      player.y = top - player.radius;
+      player.py = player.y;
+      player.grounded = true;
+      web.active = false;
+    }
+  }
+
+  // muerte: tocar el piso (salvo que tengamos vida extra, ahí rebota)
+  if (player.y + player.radius >= groundY){
+    if (player.extraLife){
+      player.extraLife = false;
+      stats.extraLifeUses++;
+      saveStats();
+      player.y = groundY - player.radius - 4;
+      player.py = player.y + 26; // impulso hacia arriba, rebote real
+      player.px = player.x - 8;
+      pickupMsg = { text: '¡Rebote! Seguís en juego 💫', timer: 70 };
+      updateLifeHud();
+    } else {
+      player.y = groundY - player.radius;
+      triggerGameOver();
+    }
+  }
+
+  cameraX = Math.max(cameraX, player.x - W*0.35);
+  ensureBuildings();
+  ensurePowerUps();
+  ensureEnemies();
+
+  score = Math.max(score, Math.floor((player.x - startBuilding.x) / 10));
+  document.getElementById('score').textContent = score;
+  if (score > best){ best = score; document.getElementById('best').textContent = best; }
+}
+
+function triggerGameOver(){
+  if (gameOver) return;
+  gameOver = true;
+  web.active = false;
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('overlay').classList.add('show');
+
+  const heightMeters = Math.floor(sessionMaxHeightPx / 10);
+  stats.bestDistance = Math.max(stats.bestDistance, score);
+  stats.bestHeight = Math.max(stats.bestHeight, heightMeters);
+  saveStats();
+}
+
+// ---------- render ----------
+function drawSky(){
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, '#2b1055');
+  grad.addColorStop(0.45, '#6a3a7a');
+  grad.addColorStop(0.75, '#e0724f');
+  grad.addColorStop(1, '#f4a259');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,W,H);
+
+  // sol
+  ctx.beginPath();
+  ctx.arc(W*0.8, H*0.32, 55, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,214,150,.55)';
+  ctx.fill();
+
+  // silueta lejana (parallax)
+  ctx.fillStyle = 'rgba(20,10,35,.55)';
+  const parX = -((cameraX*0.25) % 260);
+  for (let i=-1; i<W/260+2; i++){
+    const bx = parX + i*260;
+    const bh = 90 + ((i*97)%140);
+    ctx.fillRect(bx, groundY-bh, 170, bh);
+  }
+}
+
+function drawGround(){
+  ctx.fillStyle = '#141018';
+  ctx.fillRect(0, groundY, W, H-groundY);
+  ctx.strokeStyle = 'rgba(255,255,80,.55)';
+  ctx.lineWidth = 4;
+  ctx.setLineDash([28,20]);
+  ctx.beginPath();
+  ctx.moveTo(0, groundY+18);
+  ctx.lineTo(W, groundY+18);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawBuildings(){
+  for (const b of buildings){
+    const sx = b.x - cameraX;
+    if (sx + b.width < -20 || sx > W+20) continue;
+    const top = groundY - b.height;
+    ctx.fillStyle = '#241a33';
+    ctx.fillRect(sx, top, b.width, b.height);
+    ctx.fillStyle = 'rgba(255,210,120,.85)';
+    const cols = Math.max(2, Math.floor(b.width/26));
+    const rows = Math.max(2, Math.floor(b.height/30));
+    for (let r=0;r<rows;r++){
+      for (let c=0;c<cols;c++){
+        if ((r*cols+c + Math.floor(b.x)) % 3 === 0) continue;
+        const wx = sx + 8 + c*(b.width-16)/cols;
+        const wy = top + 10 + r*(b.height-20)/rows;
+        ctx.fillRect(wx, wy, 8, 10);
+      }
+    }
+  }
+}
+
+function drawWeb(){
+  if (web.active){
+    ctx.strokeStyle = 'rgba(255,255,255,.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(player.x - cameraX, player.y);
+    ctx.lineTo(web.anchor.x - cameraX, web.anchor.y);
+    ctx.stroke();
+  } else if (pointerDown === false){
+    // mira de puntería
+    const dist = Math.hypot(mouseX - (player.x-cameraX), mouseY - player.y);
+    if (dist < MAX_WEB){
+      ctx.strokeStyle = 'rgba(255,255,255,.25)';
+      ctx.setLineDash([4,6]);
+      ctx.beginPath();
+      ctx.moveTo(player.x-cameraX, player.y);
+      ctx.lineTo(mouseX, mouseY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+}
+
+function drawPlayer(){
+  const px = player.x - cameraX, py = player.y;
+  const dir = player.facing;
+  const skin = SKINS[selectedSkin];
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.lineCap = 'round';
+
+  // piernas
+  ctx.strokeStyle = skin.legs;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(0, 3); ctx.lineTo(-6*dir, 20);
+  ctx.moveTo(0, 3); ctx.lineTo(8*dir, 18);
+  ctx.stroke();
+
+  // torso
+  ctx.fillStyle = skin.torso;
+  ctx.beginPath();
+  ctx.ellipse(0, -4, 8, 11, 0, 0, Math.PI*2);
+  ctx.fill();
+  // franja lateral (color de acento)
+  ctx.strokeStyle = skin.accent;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-6*dir, -12); ctx.lineTo(-2*dir, 4);
+  ctx.stroke();
+
+  // brazos - uno estirado hacia el punto de la telaraña, o extendidos si planea
+  ctx.strokeStyle = skin.torso;
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  if (web.active && web.anchor){
+    const ang = Math.atan2(web.anchor.y - player.y, web.anchor.x - player.x);
+    ctx.moveTo(0, -8);
+    ctx.lineTo(Math.cos(ang)*17, -8 + Math.sin(ang)*17);
+    ctx.moveTo(0, -8); ctx.lineTo(-9*dir, -13);
+  } else if (player.gliding){
+    ctx.moveTo(0, -6); ctx.lineTo(18*dir, -2);
+    ctx.moveTo(0, -6); ctx.lineTo(-18*dir, -2);
+  } else {
+    ctx.moveTo(0, -8); ctx.lineTo(10*dir, -16);
+    ctx.moveTo(0, -8); ctx.lineTo(-9*dir, -13);
+  }
+  ctx.stroke();
+
+  // cabeza con mascara
+  ctx.fillStyle = skin.torso;
+  ctx.beginPath(); ctx.arc(0, -17, 7, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = skin.mask;
+  ctx.beginPath();
+  ctx.ellipse(2.5*dir, -18, 3.8, 2.5, 0.25*dir, 0, Math.PI*2);
+  ctx.fill();
+  if (skin.eyeGlow){
+    ctx.fillStyle = skin.eyeColor;
+    ctx.shadowColor = skin.eyeColor;
+    ctx.shadowBlur = 5;
+    ctx.beginPath();
+    ctx.ellipse(2.5*dir, -18, 2, 1.1, 0.25*dir, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.restore();
+}
+
+function drawPowerUps(){
+  const t = Date.now() / 300;
+  for (const p of powerUps){
+    const sx = p.x - cameraX;
+    if (sx < -30 || sx > W + 30) continue;
+    const bob = Math.sin(t + p.x) * 6;
+    const sy = p.y + bob;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    const glow = ctx.createRadialGradient(0,0,2,0,0,22);
+    if (p.type === 'jump'){
+      glow.addColorStop(0, 'rgba(255,209,102,.9)');
+      glow.addColorStop(1, 'rgba(255,209,102,0)');
+    } else if (p.type === 'glide'){
+      glow.addColorStop(0, 'rgba(120,220,255,.9)');
+      glow.addColorStop(1, 'rgba(120,220,255,0)');
+    } else {
+      glow.addColorStop(0, 'rgba(255,120,170,.9)');
+      glow.addColorStop(1, 'rgba(255,120,170,0)');
+    }
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.fill();
+
+    ctx.fillStyle = p.type === 'jump' ? '#ffd166' : (p.type === 'glide' ? '#78dcff' : '#ff78aa');
+    ctx.beginPath(); ctx.arc(0,0,13,0,Math.PI*2); ctx.fill();
+
+    ctx.fillStyle = '#1a1224';
+    if (p.type === 'jump'){
+      // flecha hacia arriba
+      ctx.beginPath();
+      ctx.moveTo(0,-7); ctx.lineTo(6,2); ctx.lineTo(2,2); ctx.lineTo(2,8);
+      ctx.lineTo(-2,8); ctx.lineTo(-2,2); ctx.lineTo(-6,2);
+      ctx.closePath(); ctx.fill();
+    } else if (p.type === 'glide'){
+      // ala / pluma
+      ctx.beginPath();
+      ctx.moveTo(-7,3);
+      ctx.quadraticCurveTo(0,-9, 7,3);
+      ctx.quadraticCurveTo(0,1, -7,3);
+      ctx.fill();
+    } else {
+      // corazón
+      ctx.beginPath();
+      ctx.moveTo(0,7);
+      ctx.bezierCurveTo(-9,-1, -6,-9, 0,-3);
+      ctx.bezierCurveTo(6,-9, 9,-1, 0,7);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function drawPickupMsg(){
+  if (!pickupMsg) return;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, pickupMsg.timer / 25);
+  ctx.font = 'bold 26px Segoe UI, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.shadowColor = 'rgba(0,0,0,.6)';
+  ctx.shadowBlur = 8;
+  ctx.fillText(pickupMsg.text, W/2, H*0.22);
+  ctx.restore();
+}
+
+function drawEnemies(){
+  for (const en of enemies){
+    const sx = en.drawX !== undefined ? en.drawX - cameraX : en.x - cameraX;
+    if (sx < -60 || sx > W + 60) continue;
+    const dir = en.dir || -1; // mirando hacia atrás, de donde viene el jugador
+    ctx.save();
+    ctx.translate(sx, en.y);
+
+    // aura amenazante
+    const glow = ctx.createRadialGradient(0,0,4,0,0,36);
+    glow.addColorStop(0, 'rgba(120,255,90,.28)');
+    glow.addColorStop(1, 'rgba(120,255,90,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0,2,36,0,Math.PI*2); ctx.fill();
+
+    // tabla voladora
+    ctx.fillStyle = '#22301f';
+    ctx.beginPath();
+    ctx.ellipse(0, 17, 25, 6, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#8bff5a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, 17, 25, 6, 0, 0, Math.PI*2); ctx.stroke();
+
+    ctx.lineCap = 'round';
+
+    // piernas (verde oscuro), pose parada/flexionada sobre la tabla
+    ctx.strokeStyle = '#28471f';
+    ctx.lineWidth = 5.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 5); ctx.lineTo(-8*dir, 16);
+    ctx.moveTo(0, 5); ctx.lineTo(9*dir, 15);
+    ctx.stroke();
+
+    // torso (verde)
+    ctx.fillStyle = '#357a2c';
+    ctx.beginPath();
+    ctx.ellipse(0, -3, 9, 12, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // brazos abiertos, en pose de vuelo/equilibrio
+    ctx.strokeStyle = '#357a2c';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(0, -7); ctx.lineTo(16*dir, -12);
+    ctx.moveTo(0, -7); ctx.lineTo(-15*dir, -1);
+    ctx.stroke();
+
+    // capucha (verde muy oscuro / casi negra), cubre la cabeza dejando la cara en sombra
+    ctx.fillStyle = '#1a2b14';
+    ctx.beginPath();
+    ctx.moveTo(-10, -14);
+    ctx.quadraticCurveTo(-13, -30, 0, -30);
+    ctx.quadraticCurveTo(13, -30, 10, -14);
+    ctx.quadraticCurveTo(0, -19, -10, -14);
+    ctx.closePath();
+    ctx.fill();
+
+    // rostro en sombra bajo la capucha
+    ctx.fillStyle = '#0c1409';
+    ctx.beginPath(); ctx.ellipse(0, -19, 6.5, 6, 0, 0, Math.PI*2); ctx.fill();
+
+    // ojos brillosos amarillos
+    ctx.fillStyle = '#ffe066';
+    ctx.shadowColor = '#ffe066';
+    ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.ellipse(-2.6*dir, -19.5, 2, 1.3, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(2.6*dir, -19.5, 2, 1.3, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.restore();
+  }
+}
+
+function draw(){
+  drawSky();
+  drawBuildings();
+  drawGround();
+  drawPowerUps();
+  drawEnemies();
+  drawWeb();
+  drawPlayer();
+  drawPickupMsg();
+}
+
+function loop(){
+  if (!paused) update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+initGame();
+</script>
+</body>
+</html>
