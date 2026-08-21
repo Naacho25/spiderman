@@ -8,6 +8,10 @@
     margin: 0; padding: 0; overflow: hidden;
     background: #0a0612; font-family: 'Segoe UI', Arial, sans-serif;
     height: 100%; width: 100%;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
   }
   canvas { display: block; touch-action: none; cursor: crosshair; }
 
@@ -159,6 +163,8 @@ const ctx = canvas.getContext('2d');
 let W, H;
 function resize(){ W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
 resize(); addEventListener('resize', resize);
+addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('selectstart', e => e.preventDefault());
 
 // ---------- estado global ----------
 const GRAVITY = 0.42;
@@ -658,7 +664,10 @@ function update(){
     }
   }
 
-  cameraX = Math.max(cameraX, player.x - W*0.35);
+  // la cámara sigue al jugador en las dos direcciones (no solo hacia adelante),
+  // así nunca queda afuera de pantalla al balancearse para atrás
+  const camTarget = Math.max(startBuilding.x - 120, player.x - W*0.35);
+  cameraX += (camTarget - cameraX) * 0.18;
   ensureBuildings();
   ensurePowerUps();
   ensureEnemies();
