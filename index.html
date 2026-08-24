@@ -267,7 +267,7 @@
     if (joinRoomFn) return joinRoomFn;
     setStatus('Cargando módulo de conexión…');
     try {
-      const mod = await import('https://esm.run/@trystero-p2p/torrent');
+      const mod = await import('https://esm.run/@trystero-p2p/mqtt');
       console.log('Trystero cargado, exports disponibles:', Object.keys(mod));
       if (typeof mod.joinRoom !== 'function'){
         setStatus('⚠️ El módulo cargó pero no tiene joinRoom. Exports: ' + Object.keys(mod).join(', '));
@@ -297,12 +297,34 @@
     sendHello = actions[0];
     getHello = actions[1];
 
+    const fullRoomId = 'trepamuros-' + code;
+    console.log('Sala exacta usada:', APP_ID, fullRoomId, 'rol:', hosting ? 'host' : 'guest');
+
     setStatus(hosting
       ? 'Sala creada. Código: ' + code + ' — esperando al otro jugador…'
       : 'Conectando con la sala ' + code + '…');
 
+    // chequeo periódico visible, para saber si realmente no hay ningún peer detectado
+    const pollInterval = setInterval(() => {
+      if (peerConnected){ clearInterval(pollInterval); return; }
+      try {
+        const peers = room.getPeers ? Object.keys(room.getPeers()) : null;
+        console.log('Chequeo de sala', fullRoomId, '— peers detectados:', peers);
+      } catch (e){ console.log('No se pudo listar peers:', e); }
+    }, 4000);
+
+    setTimeout(() => {
+      if (!peerConnected){
+        setStatus((hosting
+          ? 'Sigue esperando al otro jugador (código: ' + code + '). '
+          : 'Todavía no logra conectar con la sala ' + code + '. ') +
+          'Revisá que el código sea EXACTAMENTE igual de los dos lados (fijate en la consola del navegador: sala ' + fullRoomId + ').');
+      }
+    }, 18000);
+
     room.onPeerJoin(peerId => {
       peerConnected = true;
+      clearInterval(pollInterval);
       setStatus('✅ ¡Conectado! (fase 1 completa — la partida cooperativa se suma en el próximo paso)');
       sendHello({ msg: 'hola, soy ' + (hosting ? 'el anfitrión' : 'el invitado') });
     });
