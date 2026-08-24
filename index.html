@@ -112,6 +112,36 @@
     padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
     cursor: pointer; margin-top: 10px;
   }
+  #coopBtn {
+    background: transparent; color: #8aff6a; border: 2px solid #8aff6a;
+    padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
+    cursor: pointer; margin-top: 10px;
+  }
+  #coopOverlay {
+    position: fixed; inset: 0; background: rgba(6,4,14,.97); z-index: 6;
+    display: none; flex-direction: column; align-items: center;
+    padding: 36px 20px 24px; overflow-y: auto; color: #fff; text-align: center;
+    touch-action: pan-y; -webkit-overflow-scrolling: touch;
+  }
+  #coopOverlay.show { display: flex; }
+  #coopOverlay h2 { font-size: 26px; margin: 0 0 4px; }
+  #coopChoice { display: flex; gap: 12px; margin-top: 18px; flex-wrap: wrap; justify-content: center; }
+  #coopChoice button, #coopJoinConfirmBtn {
+    background: #8aff6a; color: #08260a; border: none; padding: 11px 22px;
+    border-radius: 24px; font-weight: 800; cursor: pointer; font-size: 14px;
+  }
+  #coopJoinForm { display: flex; gap: 10px; margin-top: 18px; align-items: center; }
+  #coopCodeInput {
+    background: rgba(255,255,255,.1); border: 2px solid #8aff6a; color: #fff;
+    padding: 10px 14px; border-radius: 14px; font-size: 18px; letter-spacing: 3px;
+    text-align: center; width: 130px; text-transform: uppercase;
+  }
+  #coopStatus { margin-top: 20px; font-size: 14px; color: #ccc; min-height: 20px; max-width: 360px; }
+  #closeCoop {
+    position: sticky; bottom: 6px; margin-top: 20px; background: rgba(255,255,255,.12); color: #fff;
+    border: none; padding: 11px 30px; border-radius: 24px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5); flex-shrink: 0;
+  }
   #instructionsOverlay {
     position: fixed; inset: 0; background: rgba(6,4,14,.97); z-index: 6;
     display: none; flex-direction: column; align-items: center;
@@ -197,7 +227,97 @@
   <button id="startBtn">Jugar</button>
   <button id="achievementsBtn">🏆 Logros</button>
   <button id="instructionsBtn">📖 Instrucciones</button>
+  <button id="coopBtn">👥 2 Jugadores (beta)</button>
 </div>
+
+<div id="coopOverlay">
+  <h2>👥 Cooperativo</h2>
+  <div class="ach-sub">Fase 1: conexión entre dispositivos. La partida en sí todavía no arranca acá.</div>
+
+  <div id="coopChoice">
+    <button id="coopCreateBtn">Crear sala</button>
+    <button id="coopJoinBtn">Unirse con código</button>
+  </div>
+
+  <div id="coopJoinForm" style="display:none">
+    <input id="coopCodeInput" maxlength="5" placeholder="CÓDIGO" autocapitalize="characters">
+    <button id="coopJoinConfirmBtn">Conectar</button>
+  </div>
+
+  <div id="coopStatus"></div>
+
+  <button id="closeCoop">Volver</button>
+</div>
+
+<script type="module">
+  import { joinRoom } from 'https://cdn.jsdelivr.net/npm/trystero@0.20.0/dist/trystero-torrent.min.js';
+
+  const APP_ID = 'trepamuros-coop-v1';
+  let room = null;
+  let sendHello, getHello;
+  let isHost = false;
+  let peerConnected = false;
+
+  function randomCode(){
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random()*chars.length)];
+    return code;
+  }
+
+  function setStatus(text){
+    document.getElementById('coopStatus').textContent = text;
+  }
+
+  function connectToRoom(code, hosting){
+    isHost = hosting;
+    room = joinRoom({ appId: APP_ID }, 'trepamuros-' + code);
+    const actions = room.makeAction('hello');
+    sendHello = actions[0];
+    getHello = actions[1];
+
+    setStatus(hosting
+      ? 'Sala creada. Código: ' + code + ' — esperando al otro jugador…'
+      : 'Conectando con la sala ' + code + '…');
+
+    room.onPeerJoin(peerId => {
+      peerConnected = true;
+      setStatus('✅ ¡Conectado! (fase 1 completa — la partida cooperativa se suma en el próximo paso)');
+      sendHello({ msg: 'hola, soy ' + (hosting ? 'el anfitrión' : 'el invitado') });
+    });
+
+    room.onPeerLeave(peerId => {
+      peerConnected = false;
+      setStatus('El otro jugador se desconectó.');
+    });
+
+    getHello(data => {
+      console.log('Mensaje del otro dispositivo:', data.msg);
+    });
+  }
+
+  document.getElementById('coopBtn').addEventListener('click', () => {
+    document.getElementById('coopOverlay').classList.add('show');
+  });
+  document.getElementById('closeCoop').addEventListener('click', () => {
+    document.getElementById('coopOverlay').classList.remove('show');
+  });
+  document.getElementById('coopCreateBtn').addEventListener('click', () => {
+    const code = randomCode();
+    document.getElementById('coopChoice').style.display = 'none';
+    connectToRoom(code, true);
+  });
+  document.getElementById('coopJoinBtn').addEventListener('click', () => {
+    document.getElementById('coopChoice').style.display = 'none';
+    document.getElementById('coopJoinForm').style.display = 'flex';
+  });
+  document.getElementById('coopJoinConfirmBtn').addEventListener('click', () => {
+    const code = document.getElementById('coopCodeInput').value.trim().toUpperCase();
+    if (code.length < 4) { setStatus('Escribí el código completo.'); return; }
+    document.getElementById('coopJoinForm').style.display = 'none';
+    connectToRoom(code, false);
+  });
+</script>
 
 <div id="achievementsOverlay">
   <h2>🏆 Logros</h2>
