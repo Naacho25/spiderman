@@ -267,12 +267,17 @@
     if (joinRoomFn) return joinRoomFn;
     setStatus('Cargando módulo de conexión…');
     try {
-      const mod = await import('https://cdn.jsdelivr.net/npm/trystero/dist/trystero-torrent.min.js');
+      const mod = await import('https://esm.run/@trystero-p2p/torrent');
+      console.log('Trystero cargado, exports disponibles:', Object.keys(mod));
+      if (typeof mod.joinRoom !== 'function'){
+        setStatus('⚠️ El módulo cargó pero no tiene joinRoom. Exports: ' + Object.keys(mod).join(', '));
+        return null;
+      }
       joinRoomFn = mod.joinRoom;
       return joinRoomFn;
     } catch (err){
       console.error('No se pudo cargar Trystero', err);
-      setStatus('⚠️ No se pudo cargar el módulo de conexión. Revisá tu internet y volvé a intentar.');
+      setStatus('⚠️ No se pudo cargar el módulo: ' + (err && err.message ? err.message : err));
       return null;
     }
   }
@@ -285,7 +290,7 @@
       room = joinRoom({ appId: APP_ID }, 'trepamuros-' + code);
     } catch (err){
       console.error('No se pudo crear/unir a la sala', err);
-      setStatus('⚠️ Error al conectar. Revisá el código e intentá de nuevo.');
+      setStatus('⚠️ Error al conectar: ' + (err && err.message ? err.message : err));
       return;
     }
     const actions = room.makeAction('hello');
