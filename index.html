@@ -250,28 +250,44 @@
 </div>
 
 <script type="module">
-  import { joinRoom } from 'https://cdn.jsdelivr.net/npm/trystero@0.20.0/dist/trystero-torrent.min.js';
-
   const APP_ID = 'trepamuros-coop-v1';
+  let joinRoomFn = null;
   let room = null;
   let sendHello, getHello;
   let isHost = false;
   let peerConnected = false;
 
-  function randomCode(){
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random()*chars.length)];
-    return code;
-  }
-
   function setStatus(text){
     document.getElementById('coopStatus').textContent = text;
   }
 
-  function connectToRoom(code, hosting){
+  // carga Trystero recién cuando hace falta (no al abrir la página), y si falla
+  // por lo que sea (sin internet, CDN caído, etc.) avisa en vez de quedarse mudo
+  async function ensureTrystero(){
+    if (joinRoomFn) return joinRoomFn;
+    setStatus('Cargando módulo de conexión…');
+    try {
+      const mod = await import('https://cdn.jsdelivr.net/npm/trystero/dist/trystero-torrent.min.js');
+      joinRoomFn = mod.joinRoom;
+      return joinRoomFn;
+    } catch (err){
+      console.error('No se pudo cargar Trystero', err);
+      setStatus('⚠️ No se pudo cargar el módulo de conexión. Revisá tu internet y volvé a intentar.');
+      return null;
+    }
+  }
+
+  async function connectToRoom(code, hosting){
+    const joinRoom = await ensureTrystero();
+    if (!joinRoom) return; // ensureTrystero ya mostró el error
     isHost = hosting;
-    room = joinRoom({ appId: APP_ID }, 'trepamuros-' + code);
+    try {
+      room = joinRoom({ appId: APP_ID }, 'trepamuros-' + code);
+    } catch (err){
+      console.error('No se pudo crear/unir a la sala', err);
+      setStatus('⚠️ Error al conectar. Revisá el código e intentá de nuevo.');
+      return;
+    }
     const actions = room.makeAction('hello');
     sendHello = actions[0];
     getHello = actions[1];
@@ -296,6 +312,19 @@
     });
   }
 
+  // se exponen para que el script principal del juego (que sí anda garantizado) las use
+  window.coopConnect = connectToRoom;
+</script>
+
+<script>
+  // estos listeners son del script clásico del juego: no dependen de que Trystero
+  // haya cargado bien, así que el botón y el panel SIEMPRE responden al toque/click
+  function coopRandomCode(){
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random()*chars.length)];
+    return code;
+  }
   document.getElementById('coopBtn').addEventListener('click', () => {
     document.getElementById('coopOverlay').classList.add('show');
   });
@@ -303,9 +332,10 @@
     document.getElementById('coopOverlay').classList.remove('show');
   });
   document.getElementById('coopCreateBtn').addEventListener('click', () => {
-    const code = randomCode();
+    const code = coopRandomCode();
     document.getElementById('coopChoice').style.display = 'none';
-    connectToRoom(code, true);
+    document.getElementById('coopStatus').textContent = 'Preparando conexión…';
+    if (window.coopConnect) window.coopConnect(code, true);
   });
   document.getElementById('coopJoinBtn').addEventListener('click', () => {
     document.getElementById('coopChoice').style.display = 'none';
@@ -313,9 +343,10 @@
   });
   document.getElementById('coopJoinConfirmBtn').addEventListener('click', () => {
     const code = document.getElementById('coopCodeInput').value.trim().toUpperCase();
-    if (code.length < 4) { setStatus('Escribí el código completo.'); return; }
+    if (code.length < 4) { document.getElementById('coopStatus').textContent = 'Escribí el código completo.'; return; }
     document.getElementById('coopJoinForm').style.display = 'none';
-    connectToRoom(code, false);
+    document.getElementById('coopStatus').textContent = 'Preparando conexión…';
+    if (window.coopConnect) window.coopConnect(code, false);
   });
 </script>
 
