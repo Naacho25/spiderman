@@ -1,0 +1,2424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Trepamuros - Swing entre edificios</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #0a0612; font-family: 'Segoe UI', Arial, sans-serif;
+    height: 100%; width: 100%;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  canvas { display: block; touch-action: none; cursor: crosshair; }
+
+  #hud {
+    position: fixed; top: 14px; left: 18px; color: #fff;
+    font-size: 22px; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.6);
+    letter-spacing: .5px; user-select: none; pointer-events: none; display: none;
+  }
+  #hud span { color: #ffd166; }
+
+  #hint {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,.75); font-size: 14px; text-align: center;
+    user-select: none; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,.7); display: none;
+  }
+
+  #overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; background: rgba(6,4,14,.72); backdrop-filter: blur(2px);
+    color: #fff; text-align: center; opacity: 0; pointer-events: none; transition: opacity .25s;
+  }
+  #overlay.show { opacity: 1; pointer-events: all; }
+  #overlay h1 { font-size: 40px; margin: 0 0 6px; letter-spacing: 1px; }
+  #overlay p { font-size: 17px; margin: 4px 0 20px; color: #ccc; }
+  #overlay p span { color: #ffd166; font-weight: 700; }
+  .record-line { font-size: 14px !important; margin: -12px 0 20px !important; color: #4dd0e1 !important; }
+  #restartBtn {
+    background: #ff5d5d; color: #fff; border: none; padding: 12px 30px;
+    font-size: 17px; font-weight: 700; border-radius: 30px; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(255,93,93,.4); transition: transform .1s;
+  }
+  #restartBtn:active { transform: scale(0.95); }
+  #menuFromDeathBtn {
+    display: block; margin: 10px auto 0; background: transparent; color: #ccc;
+    border: 2px solid rgba(255,255,255,.35); padding: 9px 24px; font-size: 14px;
+    font-weight: 700; border-radius: 26px; cursor: pointer;
+  }
+
+  #startOverlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; background: rgba(6,4,14,.85);
+    color: #fff; text-align: center; z-index: 5;
+  }
+  #startOverlay h1 { font-size: 34px; margin-bottom: 4px; }
+  #startOverlay p { color: #bbb; max-width: 380px; line-height: 1.5; font-size: 15px; }
+  #startBtn {
+    background: #4dd0e1; color: #08202a; border: none; padding: 13px 34px;
+    font-size: 17px; font-weight: 800; border-radius: 30px; cursor: pointer; margin-top: 18px;
+  }
+  #skinPicker {
+    display: flex; gap: 16px; margin-top: 20px; flex-wrap: wrap;
+    justify-content: center; max-width: 380px;
+  }
+  .skin-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .skin-swatch {
+    width: 48px; height: 48px; border-radius: 50%; cursor: pointer;
+    border: 3px solid transparent; box-shadow: 0 3px 10px rgba(0,0,0,.5);
+    transition: transform .12s, border-color .15s;
+  }
+  .skin-swatch:hover { transform: scale(1.06); }
+  .skin-swatch.selected { border-color: #fff; transform: scale(1.1); }
+  .skin-label { font-size: 11px; color: #bbb; }
+  .skin-label.selected { color: #fff; font-weight: 700; }
+
+  #achievementsBtn {
+    background: transparent; color: #ffd166; border: 2px solid #ffd166;
+    padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
+    cursor: pointer; margin-top: 14px;
+  }
+  #achievementsOverlay {
+    position: fixed; inset: 0; background: rgba(6,4,14,.97); z-index: 6;
+    display: none; flex-direction: column; align-items: center;
+    padding: 36px 20px 24px; overflow-y: auto; color: #fff; text-align: center;
+    touch-action: pan-y; -webkit-overflow-scrolling: touch;
+  }
+  #achievementsOverlay.show { display: flex; }
+  #achievementsOverlay h2 { font-size: 26px; margin: 0 0 4px; }
+  #achievementsOverlay .ach-sub { color: #999; font-size: 13px; margin-bottom: 18px; }
+  #achievementsList { max-width: 440px; width: 100%; }
+  .ach-group { margin-bottom: 16px; text-align: left; }
+  .ach-group h3 { font-size: 14px; color: #ffd166; margin: 0 0 8px; }
+  .ach-row {
+    display: flex; gap: 12px; align-items: center; padding: 8px 10px;
+    border-radius: 10px; background: rgba(255,255,255,.04); margin-bottom: 6px; opacity: .5;
+  }
+  .ach-row.unlocked { opacity: 1; background: rgba(255,209,102,.14); }
+  .ach-icon { font-size: 20px; flex-shrink: 0; }
+  .ach-name { font-size: 14px; font-weight: 700; }
+  .ach-desc { font-size: 12px; color: #aaa; }
+  #closeAchievements {
+    position: sticky; bottom: 6px; margin-top: 14px; background: #ffd166; color: #3a2400;
+    border: none; padding: 11px 30px; border-radius: 24px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5); flex-shrink: 0;
+  }
+
+  #instructionsBtn {
+    background: transparent; color: #4dd0e1; border: 2px solid #4dd0e1;
+    padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
+    cursor: pointer; margin-top: 10px;
+  }
+  #coopBtn {
+    background: transparent; color: #8aff6a; border: 2px solid #8aff6a;
+    padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
+    cursor: pointer; margin-top: 10px;
+  }
+  #coopOverlay {
+    position: fixed; inset: 0; background: rgba(6,4,14,.97); z-index: 6;
+    display: none; flex-direction: column; align-items: center;
+    padding: 36px 20px 24px; overflow-y: auto; color: #fff; text-align: center;
+    touch-action: pan-y; -webkit-overflow-scrolling: touch;
+  }
+  #coopOverlay.show { display: flex; }
+  #coopOverlay h2 { font-size: 26px; margin: 0 0 4px; }
+  #coopChoice { display: flex; gap: 12px; margin-top: 18px; flex-wrap: wrap; justify-content: center; }
+  #coopChoice button, #coopJoinConfirmBtn {
+    background: #8aff6a; color: #08260a; border: none; padding: 11px 22px;
+    border-radius: 24px; font-weight: 800; cursor: pointer; font-size: 14px;
+  }
+  #coopJoinForm { display: flex; gap: 10px; margin-top: 18px; align-items: center; }
+  #coopCodeInput {
+    background: rgba(255,255,255,.1); border: 2px solid #8aff6a; color: #fff;
+    padding: 10px 14px; border-radius: 14px; font-size: 18px; letter-spacing: 3px;
+    text-align: center; width: 130px; text-transform: uppercase;
+  }
+  #coopStatus { margin-top: 20px; font-size: 14px; color: #ccc; min-height: 20px; max-width: 360px; }
+  #closeCoop {
+    position: sticky; bottom: 6px; margin-top: 20px; background: rgba(255,255,255,.12); color: #fff;
+    border: none; padding: 11px 30px; border-radius: 24px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5); flex-shrink: 0;
+  }
+  #instructionsOverlay {
+    position: fixed; inset: 0; background: rgba(6,4,14,.97); z-index: 6;
+    display: none; flex-direction: column; align-items: center;
+    padding: 36px 20px 24px; overflow-y: auto; color: #fff; text-align: center;
+    touch-action: pan-y; -webkit-overflow-scrolling: touch;
+  }
+  #instructionsOverlay.show { display: flex; }
+  #instructionsOverlay h2 { font-size: 26px; margin: 0 0 18px; }
+  #instructionsList { max-width: 460px; width: 100%; text-align: left; }
+  .instr-row {
+    display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px;
+    border-radius: 10px; background: rgba(255,255,255,.05); margin-bottom: 8px;
+  }
+  .instr-icon { font-size: 20px; flex-shrink: 0; }
+  .instr-name { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .instr-desc { font-size: 12.5px; color: #bbb; line-height: 1.4; }
+  #closeInstructions {
+    position: sticky; bottom: 6px; margin-top: 14px; background: #4dd0e1; color: #08202a;
+    border: none; padding: 11px 30px; border-radius: 24px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5); flex-shrink: 0;
+  }
+
+  #pauseBtn {
+    position: fixed; top: 14px; right: 18px; width: 42px; height: 42px;
+    border-radius: 50%; background: rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.5);
+    color: #fff; font-size: 18px; display: none; align-items: center; justify-content: center;
+    cursor: pointer; z-index: 4;
+  }
+  #achievementToast {
+    position: fixed; top: 66px; left: 50%; z-index: 8;
+    transform: translateX(-50%) translateY(-14px);
+    background: linear-gradient(135deg, #ffd166, #ffb347); color: #3a2400;
+    padding: 10px 20px; border-radius: 16px; font-size: 14px; font-weight: 800;
+    box-shadow: 0 8px 20px rgba(0,0,0,.4); opacity: 0; pointer-events: none;
+    transition: opacity .3s, transform .3s; display: flex; align-items: center; gap: 8px;
+    white-space: nowrap;
+  }
+  #achievementToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #pauseOverlay {
+    position: fixed; inset: 0; background: rgba(6,4,14,.85); z-index: 7;
+    display: none; align-items: center; justify-content: center; flex-direction: column;
+    color: #fff; text-align: center;
+  }
+  #pauseOverlay.show { display: flex; }
+  #pauseOverlay h2 { font-size: 30px; margin: 0 0 22px; }
+  #pauseOverlay button {
+    display: block; width: 220px; margin: 7px 0; padding: 12px 0;
+    border-radius: 26px; border: none; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  #resumeBtn { background: #4dd0e1; color: #08202a; }
+  #restartFromPauseBtn { background: rgba(255,255,255,.12); color: #fff; }
+  #menuBtn { background: rgba(255,255,255,.12); color: #fff; }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="hud">🏙 <span id="score">0</span> m &nbsp; | &nbsp; 🏆 <span id="best">0</span> m &nbsp; <span id="lifeIndicator" style="display:none">💫</span></div>
+<div id="hint">Tocá para engancharte · Arrastrá arriba/abajo (o la ruedita) para alargar/achicar la telaraña · Movete a los costados para impulso · 🚀 salto, 🕸️ disparo, 💫 rebote extra</div>
+<button id="pauseBtn">⏸</button>
+<div id="achievementToast"></div>
+
+<div id="pauseOverlay">
+  <h2>⏸ Pausa</h2>
+  <button id="resumeBtn">Continuar</button>
+  <button id="restartFromPauseBtn">Reiniciar</button>
+  <button id="menuBtn">Menú principal</button>
+</div>
+
+<div id="overlay">
+  <h1 id="deathTitle">💥 Tocaste el piso</h1>
+  <p>Distancia recorrida: <span id="finalScore">0</span> m</p>
+  <p id="recordLine" class="record-line"></p>
+  <button id="restartBtn">Reintentar</button>
+  <button id="menuFromDeathBtn">Menú principal</button>
+</div>
+
+<div id="startOverlay">
+  <h1>🕸️ Trepamuros</h1>
+  <p>Colgate de edificio en edificio con tu telaraña. Apuntá con el mouse (o el dedo) a una pared y mantené presionado para engancharte. Si tocás la calle, se acabó.</p>
+  <div id="skinPicker"></div>
+  <button id="startBtn">Jugar</button>
+  <button id="achievementsBtn">🏆 Logros</button>
+  <button id="instructionsBtn">📖 Instrucciones</button>
+  <button id="coopBtn">👥 2 Jugadores (beta)</button>
+</div>
+
+<div id="coopOverlay">
+  <h2>👥 Cooperativo</h2>
+  <div class="ach-sub">Fase 1: conexión entre dispositivos. La partida en sí todavía no arranca acá.</div>
+
+  <div id="coopChoice">
+    <button id="coopCreateBtn">Crear sala</button>
+    <button id="coopJoinBtn">Unirse con código</button>
+  </div>
+
+  <div id="coopJoinForm" style="display:none">
+    <input id="coopCodeInput" maxlength="5" placeholder="CÓDIGO" autocapitalize="characters">
+    <button id="coopJoinConfirmBtn">Conectar</button>
+  </div>
+
+  <div id="coopStatus"></div>
+
+  <button id="closeCoop">Volver</button>
+</div>
+
+<script type="module">
+  const APP_ID = 'trepamuros-coop-v1';
+  let joinRoomFn = null;
+  let room = null;
+  let sendHello, getHello;
+  let isHost = false;
+  let peerConnected = false;
+
+  function setStatus(text){
+    document.getElementById('coopStatus').textContent = text;
+  }
+
+  // carga Trystero recién cuando hace falta (no al abrir la página), y si falla
+  // por lo que sea (sin internet, CDN caído, etc.) avisa en vez de quedarse mudo
+  async function ensureTrystero(){
+    if (joinRoomFn) return joinRoomFn;
+    setStatus('Cargando módulo de conexión…');
+    try {
+      const mod = await import('https://esm.run/@trystero-p2p/nostr');
+      console.log('Trystero cargado, exports disponibles:', Object.keys(mod));
+      if (typeof mod.joinRoom !== 'function'){
+        setStatus('⚠️ El módulo cargó pero no tiene joinRoom. Exports: ' + Object.keys(mod).join(', '));
+        return null;
+      }
+      joinRoomFn = mod.joinRoom;
+      return joinRoomFn;
+    } catch (err){
+      console.error('No se pudo cargar Trystero', err);
+      setStatus('⚠️ No se pudo cargar el módulo: ' + (err && err.message ? err.message : err));
+      return null;
+    }
+  }
+
+  async function connectToRoom(code, hosting){
+    const joinRoom = await ensureTrystero();
+    if (!joinRoom) return; // ensureTrystero ya mostró el error
+    isHost = hosting;
+    try {
+      room = joinRoom({ appId: APP_ID }, 'trepamuros-' + code);
+    } catch (err){
+      console.error('No se pudo crear/unir a la sala', err);
+      setStatus('⚠️ Error al conectar: ' + (err && err.message ? err.message : err));
+      return;
+    }
+    const actions = room.makeAction('hello');
+    sendHello = actions[0];
+    getHello = actions[1];
+
+    setStatus(hosting
+      ? 'Sala creada. Código: ' + code + ' — esperando al otro jugador…'
+      : 'Conectando con la sala ' + code + '…');
+
+    setTimeout(() => {
+      if (!peerConnected){
+        setStatus((hosting
+          ? 'Sigue esperando al otro jugador (código: ' + code + '). '
+          : 'Todavía no logra conectar con la sala ' + code + '. ') +
+          'Revisá que el código sea exactamente igual de los dos lados, y que los dos tengan buena conexión a internet.');
+      }
+    }, 18000);
+
+    room.onPeerJoin(peerId => {
+      peerConnected = true;
+      setStatus('✅ ¡Conectado! (fase 1 completa — la partida cooperativa se suma en el próximo paso)');
+      sendHello({ msg: 'hola, soy ' + (hosting ? 'el anfitrión' : 'el invitado') });
+    });
+
+    room.onPeerLeave(peerId => {
+      peerConnected = false;
+      setStatus('El otro jugador se desconectó.');
+    });
+
+    getHello(data => {
+      console.log('Mensaje del otro dispositivo:', data.msg);
+    });
+  }
+
+  // se exponen para que el script principal del juego (que sí anda garantizado) las use
+  window.coopConnect = connectToRoom;
+</script>
+
+<script>
+  // estos listeners son del script clásico del juego: no dependen de que Trystero
+  // haya cargado bien, así que el botón y el panel SIEMPRE responden al toque/click
+  function coopRandomCode(){
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random()*chars.length)];
+    return code;
+  }
+  document.getElementById('coopBtn').addEventListener('click', () => {
+    document.getElementById('coopOverlay').classList.add('show');
+  });
+  document.getElementById('closeCoop').addEventListener('click', () => {
+    document.getElementById('coopOverlay').classList.remove('show');
+  });
+  document.getElementById('coopCreateBtn').addEventListener('click', () => {
+    const code = coopRandomCode();
+    document.getElementById('coopChoice').style.display = 'none';
+    document.getElementById('coopStatus').textContent = 'Preparando conexión…';
+    if (window.coopConnect) window.coopConnect(code, true);
+  });
+  document.getElementById('coopJoinBtn').addEventListener('click', () => {
+    document.getElementById('coopChoice').style.display = 'none';
+    document.getElementById('coopJoinForm').style.display = 'flex';
+  });
+  document.getElementById('coopJoinConfirmBtn').addEventListener('click', () => {
+    const code = document.getElementById('coopCodeInput').value.trim().toUpperCase();
+    if (code.length < 4) { document.getElementById('coopStatus').textContent = 'Escribí el código completo.'; return; }
+    document.getElementById('coopJoinForm').style.display = 'none';
+    document.getElementById('coopStatus').textContent = 'Preparando conexión…';
+    if (window.coopConnect) window.coopConnect(code, false);
+  });
+</script>
+
+<div id="achievementsOverlay">
+  <h2>🏆 Logros</h2>
+  <div class="ach-sub">Se guardan solos entre partidas</div>
+  <div id="achievementsList"></div>
+  <button id="closeAchievements">Volver</button>
+</div>
+
+<div id="instructionsOverlay">
+  <h2>📖 Instrucciones</h2>
+  <div id="instructionsList">
+    <div class="instr-row">
+      <span class="instr-icon">🕸️</span>
+      <div><div class="instr-name">Saltar y engancharte</div><div class="instr-desc">Tocá la pantalla (o click) apuntando a un edificio para saltar del edificio inicial y engancharte con la telaraña. Es una caída libre, no un salto con impulso. La telaraña pega exacto donde tocás — si no hay pared justo ahí, o si apuntás por arriba del techo, sale una ✕ y la telaraña no engancha en ningún lado.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🤏</span>
+      <div><div class="instr-name">Soltar y volar</div><div class="instr-desc">Soltá el dedo/click para largar la telaraña y salir disparado con el impulso que traías. El timing de la soltada define qué tan lejos llegás.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">💪</span>
+      <div><div class="instr-name">Bombear el swing</div><div class="instr-desc">Mientras estás colgado con el dedo/click sostenido, movete para los costados para sumar impulso lateral y tomar más velocidad si quedaste medio trabado.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">↕️</span>
+      <div><div class="instr-name">Largo de la telaraña</div><div class="instr-desc">Colgado, arrastrá el dedo hacia arriba para alargar la telaraña o hacia abajo para acortarla. En PC, usá la ruedita del mouse (arriba alarga, abajo achica).</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🏙️</span>
+      <div><div class="instr-name">Nueva York</div><div class="instr-desc">La ciudad tiene edificios comunes, pero cada tanto te vas a cruzar con algo temático — referencias al Empire State, al One World Trade Center y a Times Square, con su fachada llena de carteles de neón.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🌇</span>
+      <div><div class="instr-name">Ciclo del día</div><div class="instr-desc">Cada partida arranca de mañana y el cielo va cambiando lentamente durante todo el recorrido — mediodía, atardecer, noche con estrellas y luna, y vuelta a amanecer.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🏢</span>
+      <div><div class="instr-name">Sin apoyo</div><div class="instr-desc">Solo el primer edificio sirve de plataforma para arrancar. Después de eso, todo es en el aire — no te podés parar en ningún otro techo.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🚀</span>
+      <div><div class="instr-name">Power-up: Súper salto</div><div class="instr-desc">Te da un impulso hacia arriba y adelante para cubrir varios metros de una.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🕸️</span>
+      <div><div class="instr-name">Power-up: Disparo automático</div><div class="instr-desc">Durante unos segundos vas tirando telarañas solo, sin apuntar — cualquier enemigo cercano que toquen queda derrotado. Podés seguir colgado y moviéndote mientras dispara.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">💫</span>
+      <div><div class="instr-name">Power-up: Vida extra</div><div class="instr-desc">Se acumulan (podés tener más de una a la vez, se ven en el HUD). Si tocás el piso o chocás con el villano, gastás una y rebotás para seguir jugando en vez de perder.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">📈</span>
+      <div><div class="instr-name">Dificultad progresiva</div><div class="instr-desc">Al principio del recorrido no hay ningún enemigo. A medida que avanzás metros, van apareciendo y cada vez más seguido y más agresivos.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🦹</span>
+      <div><div class="instr-name">Villano volador</div><div class="instr-desc">Aparece flotando por el mapa a partir de los primeros metros. Esquivalo, o si tenés una vida extra vas a "derrotarlo" y seguir de largo.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🦾</span>
+      <div><div class="instr-name">Trepador mecánico</div><div class="instr-desc">Aparece más adelante en el recorrido, subiendo y bajando por los edificios con sus brazos articulados. Cuidado al pasar cerca.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🦏</span>
+      <div><div class="instr-name">Corredor callejero</div><div class="instr-desc">Corre por la calle a nivel del piso. Si volás bajito cerca de la calle, te lleva puesto — mantené altura para esquivarlo.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">✋</span>
+      <div><div class="instr-name">Mano gigante de arena</div><div class="instr-desc">A partir de tramos más avanzados, una mano enorme emerge del fondo tratando de agarrarte. Esquivala pasando lejos o por arriba.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🦂</span>
+      <div><div class="instr-name">Francotirador de techo</div><div class="instr-desc">Se queda quieto arriba de un edificio y dispara veneno con la cola hacia vos. Aparece en los tramos más avanzados y dispara cada vez más seguido.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🏗️</span>
+      <div><div class="instr-name">Grúa móvil</div><div class="instr-desc">Su gancho se desliza de un lado a otro en loop. Tenés que esperar el momento justo en que esté cerca para engancharte y seguir avanzando.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🚁</span>
+      <div><div class="instr-name">Helicóptero de ayuda</div><div class="instr-desc">Aparece muy de vez en cuando. Enganchate y te lleva rápido por unos segundos — después se eleva y te suelta para que sigas por tu cuenta.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">👕</span>
+      <div><div class="instr-name">Trajes</div><div class="instr-desc">Elegí tu skin en el menú principal antes de jugar. Hay 5 para probar.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🏆</span>
+      <div><div class="instr-name">Logros</div><div class="instr-desc">Se desbloquean por distancia, altura, power-ups agarrados, enemigos esquivados y más. Se guardan solos entre partidas.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">⏸</span>
+      <div><div class="instr-name">Pausa</div><div class="instr-desc">Botón arriba a la derecha (o tecla Escape/P) para pausar y volver al menú principal sin perder tu progreso guardado.</div></div>
+    </div>
+  </div>
+  <button id="closeInstructions">Volver</button>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize(){ W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('selectstart', e => e.preventDefault());
+
+// ---------- estado global ----------
+const GRAVITY = 0.42;
+const DAMPING = 0.997;
+const AIR_CONTROL = 0.34;
+const MAX_WEB = 520;
+const JUMP_VY = -12;
+const AUTO_SHOOT_DURATION = 300; // ~5s a 60fps
+const AUTO_SHOOT_COOLDOWN = 24;  // frames entre disparo y disparo
+
+let groundY, cameraX, buildings, powerUps, enemies, climbers, sandHands, rhinos, scorpions, poisonBolts, cranes, helicopters, webShots, player, web, keys, score, best = 0, running = false, gameOver = false;
+let startBuilding, canLand, pickupMsg = null, pumpVel = 0, sessionMaxHeightPx = 0, paused = false, progressM = 0;
+let deathTitle = '💥 Tocaste el piso';
+let elapsedFrames = 0;
+let missMarker = null, webThrow = null;
+let nextHeliAt = 0;
+let lastCycleIndex = 0;
+
+// ---------- skins ----------
+const SKINS = [
+  { id:'classic', name:'Clásico',  torso:'#e0262c', accent:'#1b3fa0', legs:'#1b3fa0', mask:'#141824', eyeGlow:false },
+  { id:'noir',    name:'Nocturno', torso:'#202024', accent:'#4a4a54', legs:'#111114', mask:'#0a0a0c', eyeGlow:true,  eyeColor:'#ffffff' },
+  { id:'tech',    name:'Dorado',   torso:'#a8262c', accent:'#d4af37', legs:'#2b2b2b', mask:'#5c1418', eyeGlow:true,  eyeColor:'#ffd76a' },
+  { id:'future',  name:'Blanco',   torso:'#e9e9ec', accent:'#c0272d', legs:'#c0272d', mask:'#1c1c22', eyeGlow:false },
+  { id:'stealth', name:'Sigilo',   torso:'#1c2b45', accent:'#2f4a73', legs:'#0f1a2b', mask:'#0c1420', eyeGlow:true,  eyeColor:'#4dd0e1' },
+];
+let selectedSkin = 0;
+
+function renderSkinPicker(){
+  const el = document.getElementById('skinPicker');
+  el.innerHTML = '';
+  SKINS.forEach((s, i) => {
+    const item = document.createElement('div');
+    item.className = 'skin-item';
+    const swatch = document.createElement('div');
+    swatch.className = 'skin-swatch' + (i === selectedSkin ? ' selected' : '');
+    swatch.style.background = `linear-gradient(135deg, ${s.torso} 55%, ${s.legs} 55%)`;
+    swatch.addEventListener('click', () => { selectedSkin = i; renderSkinPicker(); });
+    const label = document.createElement('div');
+    label.className = 'skin-label' + (i === selectedSkin ? ' selected' : '');
+    label.textContent = s.name;
+    item.appendChild(swatch);
+    item.appendChild(label);
+    el.appendChild(item);
+  });
+}
+renderSkinPicker();
+
+// ---------- logros (persistidos entre partidas) ----------
+let stats = {
+  bestDistance: 0, bestHeight: 0, totalPowerUps: 0,
+  totalEnemiesAvoided: 0, extraLifeUses: 0, skinsUsed: [],
+  enemiesDefeated: 0, totalDayCycles: 0, enemyTypesSeen: [],
+  landmarkCounts: { empire: 0, wtc: 0, times: 0 }, unlockedIds: []
+};
+
+function loadStats(){
+  try {
+    const raw = localStorage.getItem('trepamuros_stats');
+    if (raw) stats = Object.assign(stats, JSON.parse(raw));
+  } catch (e) { /* almacenamiento local no disponible en este entorno */ }
+  if (!stats.unlockedIds) stats.unlockedIds = [];
+  // sincroniza en silencio: no avisar por logros que ya estaban cumplidos antes de esta versión
+  for (const a of ACHIEVEMENTS){
+    if (!stats.unlockedIds.includes(a.id) && a.check(stats)) stats.unlockedIds.push(a.id);
+  }
+  renderAchievements();
+}
+function saveStats(){
+  checkNewAchievements();
+  try { localStorage.setItem('trepamuros_stats', JSON.stringify(stats)); }
+  catch (e) { console.error('No se pudo guardar el progreso', e); }
+}
+
+// detecta logros recién desbloqueados y los muestra en un aviso, uno por vez
+function checkNewAchievements(){
+  if (!stats.unlockedIds) stats.unlockedIds = [];
+  for (const a of ACHIEVEMENTS){
+    if (!stats.unlockedIds.includes(a.id) && a.check(stats)){
+      stats.unlockedIds.push(a.id);
+      queueAchievementToast(a);
+    }
+  }
+}
+
+let achievementToastQueue = [];
+let achievementToastBusy = false;
+function queueAchievementToast(a){
+  achievementToastQueue.push(a);
+  processAchievementToastQueue();
+}
+function processAchievementToastQueue(){
+  if (achievementToastBusy || achievementToastQueue.length === 0) return;
+  achievementToastBusy = true;
+  const a = achievementToastQueue.shift();
+  const el = document.getElementById('achievementToast');
+  el.innerHTML = '🏅 Logro desbloqueado: <strong>' + a.name + '</strong>';
+  el.classList.add('show');
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => { achievementToastBusy = false; processAchievementToastQueue(); }, 300);
+  }, 2600);
+}
+
+const ACHIEVEMENTS = [
+  { id:'dist_800', category:'distancia', name:'Corredor urbano', desc:'Recorré 800 m en una partida', check: s => s.bestDistance >= 800 },
+  { id:'dist_2500', category:'distancia', name:'Maratón de azotea', desc:'Recorré 2500 m en una partida', check: s => s.bestDistance >= 2500 },
+  { id:'dist_6000', category:'distancia', name:'Leyenda de la ciudad', desc:'Recorré 6000 m en una partida', check: s => s.bestDistance >= 6000 },
+
+  { id:'height_50', category:'altura', name:'Primeros pasos en el aire', desc:'Llegá a 50 m de altura', check: s => s.bestHeight >= 50 },
+  { id:'height_110', category:'altura', name:'Vértigo', desc:'Llegá a 110 m de altura', check: s => s.bestHeight >= 110 },
+  { id:'height_190', category:'altura', name:'Rozando las nubes', desc:'Llegá a 190 m de altura', check: s => s.bestHeight >= 190 },
+
+  { id:'power_10', category:'powerups', name:'Primeros poderes', desc:'Agarrá 10 power-ups en total', check: s => s.totalPowerUps >= 10 },
+  { id:'power_50', category:'powerups', name:'Coleccionista', desc:'Agarrá 50 power-ups en total', check: s => s.totalPowerUps >= 50 },
+  { id:'power_150', category:'powerups', name:'Acumulador experto', desc:'Agarrá 150 power-ups en total', check: s => s.totalPowerUps >= 150 },
+
+  { id:'dodge_8', category:'enemigos', name:'Esquivador novato', desc:'Esquivá o derrotá 8 enemigos', check: s => s.totalEnemiesAvoided >= 8 },
+  { id:'dodge_30', category:'enemigos', name:'Reflejos arácnidos', desc:'Esquivá o derrotá 30 enemigos', check: s => s.totalEnemiesAvoided >= 30 },
+  { id:'dodge_80', category:'enemigos', name:'Maestro esquivador', desc:'Esquivá o derrotá 80 enemigos', check: s => s.totalEnemiesAvoided >= 80 },
+  { id:'variety_all', category:'enemigos', name:'Los conocés a todos', desc:'Cruzate con los 5 tipos de enemigo distintos', check: s => (s.enemyTypesSeen||[]).length >= 5 },
+
+  { id:'defeat_1', category:'derrotas', name:'Primera victoria', desc:'Derrotá a tu primer enemigo', check: s => s.enemiesDefeated >= 1 },
+  { id:'defeat_10', category:'derrotas', name:'Vengador urbano', desc:'Derrotá a 10 enemigos en total', check: s => s.enemiesDefeated >= 10 },
+  { id:'defeat_30', category:'derrotas', name:'Terror de los villanos', desc:'Derrotá a 30 enemigos en total', check: s => s.enemiesDefeated >= 30 },
+  { id:'defeat_75', category:'derrotas', name:'Francotirador', desc:'Derrotá a 75 enemigos en total', check: s => s.enemiesDefeated >= 75 },
+  { id:'defeat_150', category:'derrotas', name:'Leyenda de la telaraña', desc:'Derrotá a 150 enemigos en total', check: s => s.enemiesDefeated >= 150 },
+
+  { id:'landmark_empire', category:'edificios', name:'Rascacielos icónico', desc:'Pasá cerca del Empire State', check: s => (s.landmarkCounts && s.landmarkCounts.empire || 0) >= 1 },
+  { id:'landmark_wtc', category:'edificios', name:'Torre de vidrio', desc:'Pasá cerca del One World Trade Center', check: s => (s.landmarkCounts && s.landmarkCounts.wtc || 0) >= 1 },
+  { id:'landmark_times', category:'edificios', name:'Luces de neón', desc:'Pasá cerca de Times Square', check: s => (s.landmarkCounts && s.landmarkCounts.times || 0) >= 1 },
+  { id:'landmark_all', category:'edificios', name:'Turista arácnido', desc:'Encontrá los 3 edificios temáticos al menos una vez', check: s => {
+      const l = s.landmarkCounts || {};
+      return (l.empire||0) >= 1 && (l.wtc||0) >= 1 && (l.times||0) >= 1;
+    } },
+  { id:'landmark_20', category:'edificios', name:'Guía turística', desc:'Cruzate con 20 edificios temáticos en total', check: s => {
+      const l = s.landmarkCounts || {};
+      return (l.empire||0) + (l.wtc||0) + (l.times||0) >= 20;
+    } },
+
+  { id:'day_1', category:'ciclo', name:'Un día en la ciudad', desc:'Completá 1 ciclo del día entero', check: s => s.totalDayCycles >= 1 },
+  { id:'day_5', category:'ciclo', name:'Varios amaneceres', desc:'Completá 5 ciclos del día en total', check: s => s.totalDayCycles >= 5 },
+  { id:'day_15', category:'ciclo', name:'El vigilante nocturno', desc:'Completá 15 ciclos del día en total', check: s => s.totalDayCycles >= 15 },
+
+  { id:'skins_all', category:'extra', name:'Guardarropa completo', desc:'Probá los 5 trajes disponibles', check: s => (s.skinsUsed||[]).length >= SKINS.length },
+  { id:'extralife', category:'extra', name:'Segunda oportunidad', desc:'Usá un rebote de vida extra', check: s => s.extraLifeUses >= 1 },
+];
+
+function renderAchievements(){
+  const list = document.getElementById('achievementsList');
+  if (!list) return;
+  const categories = {
+    distancia: '📏 Distancia', altura: '🪂 Altura', powerups: '✨ Power-ups',
+    enemigos: '🕵️ Enemigos esquivados', derrotas: '⚔️ Enemigos derrotados',
+    edificios: '🏙️ Edificios de Nueva York', ciclo: '🌇 Ciclo del día',
+    extra: '🌟 Especiales'
+  };
+  list.innerHTML = '';
+  Object.keys(categories).forEach(catKey => {
+    const group = document.createElement('div');
+    group.className = 'ach-group';
+    const h = document.createElement('h3');
+    h.textContent = categories[catKey];
+    group.appendChild(h);
+    ACHIEVEMENTS.filter(a => a.category === catKey).forEach(a => {
+      const unlocked = a.check(stats);
+      const row = document.createElement('div');
+      row.className = 'ach-row' + (unlocked ? ' unlocked' : '');
+      row.innerHTML =
+        '<span class="ach-icon">' + (unlocked ? '🏅' : '🔒') + '</span>' +
+        '<div><div class="ach-name">' + a.name + '</div><div class="ach-desc">' + a.desc + '</div></div>';
+      group.appendChild(row);
+    });
+    list.appendChild(group);
+  });
+}
+
+document.getElementById('achievementsBtn').addEventListener('click', () => {
+  renderAchievements();
+  document.getElementById('achievementsOverlay').classList.add('show');
+});
+document.getElementById('closeAchievements').addEventListener('click', () => {
+  document.getElementById('achievementsOverlay').classList.remove('show');
+});
+document.getElementById('instructionsBtn').addEventListener('click', () => {
+  document.getElementById('instructionsOverlay').classList.add('show');
+});
+document.getElementById('closeInstructions').addEventListener('click', () => {
+  document.getElementById('instructionsOverlay').classList.remove('show');
+});
+loadStats();
+
+// cada tanto, en vez de un edificio genérico, sale uno temático de Nueva York
+function makeBuilding(x, baseWidth, baseHeight){
+  const b = { x, width: baseWidth, height: baseHeight, landmark: null };
+  if (progressM < DIFF.landmarkStart) return b; // recién aparecen en tramos más avanzados
+  const roll = Math.random();
+  if (roll < 0.035){
+    b.landmark = 'empire';               // referencia al Empire State: torre escalonada con antena
+    b.width = 130 + Math.random()*30;
+    b.height = H * (0.74 + Math.random()*0.14);
+  } else if (roll < 0.06){
+    b.landmark = 'wtc';                  // referencia al One World Trade Center: aguja de vidrio altísima
+    b.width = 70 + Math.random()*30;
+    b.height = H * (0.84 + Math.random()*0.1);
+  } else if (roll < 0.10){
+    b.landmark = 'times';                // referencia a Times Square: fachada llena de carteles de neón
+    b.width = 230 + Math.random()*110;
+    b.height = H * (0.32 + Math.random()*0.16);
+  }
+  return b;
+}
+
+function initGame(){
+  groundY = H - 70;
+  cameraX = 0;
+  score = 0;
+  sessionMaxHeightPx = 0;
+  deathTitle = '💥 Tocaste el piso';
+  elapsedFrames = 0;
+  lastCycleIndex = 0;
+  buildings = [];
+  powerUps = [];
+  enemies = [];
+  climbers = [];
+  sandHands = [];
+  rhinos = [];
+  scorpions = [];
+  poisonBolts = [];
+  cranes = [];
+  helicopters = [];
+  webShots = [];
+  nextHeliAt = 0;
+  web = { active:false, anchor:null, len:0 };
+  keys = { left:false, right:false };
+  pumpVel = 0;
+  missMarker = null;
+  webThrow = null;
+
+  if (!stats.skinsUsed.includes(SKINS[selectedSkin].id)){
+    stats.skinsUsed.push(SKINS[selectedSkin].id);
+    saveStats();
+  }
+
+  // primer edificio, plataforma segura
+  buildings.push({ x:-100, width:340, height:H*0.42, landmark:null });
+  let lastEnd = 240;
+  while (lastEnd < W*2){
+    const gap = 60 + Math.random()*100;
+    const width = 110 + Math.random()*170;
+    const height = H*(0.26 + Math.random()*0.44);
+    const x = lastEnd + gap;
+    const b = makeBuilding(x, width, height);
+    buildings.push(b);
+    lastEnd = x + b.width;
+  }
+
+  const first = buildings[0];
+  startBuilding = first;
+  canLand = true;
+  player = {
+    x: first.x + first.width/2, y: groundY - first.height - 14,
+    px: 0, py: 0, radius: 14, grounded: true, facing: 1, autoShoot: false, autoShootTimer: 0, shootCooldown: 0, extraLives: 0, riding: null
+  };
+  player.px = player.x; player.py = player.y;
+  updateLifeHud();
+
+  gameOver = false;
+  document.getElementById('overlay').classList.remove('show');
+}
+
+function ensureBuildings(){
+  let last = buildings[buildings.length-1];
+  while (last.x + last.width < cameraX + W + 500){
+    const gap = 60 + Math.random()*110;
+    const width = 110 + Math.random()*180;
+    const height = H*(0.24 + Math.random()*0.44);
+    const x = last.x + last.width + gap;
+    const b = makeBuilding(x, width, height);
+    buildings.push(b);
+    last = b;
+  }
+  // limpiar edificios muy atrás
+  buildings = buildings.filter(b => b.x + b.width > cameraX - 300);
+}
+
+const POWERUP_TYPES = ['jump', 'shoot', 'life'];
+
+// registra que te cruzaste con este tipo de enemigo (para el logro de variedad)
+function registerEnemyType(type){
+  if (!stats.enemyTypesSeen) stats.enemyTypesSeen = [];
+  if (!stats.enemyTypesSeen.includes(type)){
+    stats.enemyTypesSeen.push(type);
+    saveStats();
+  }
+}
+
+function ensurePowerUps(){
+  let lastX = powerUps.length ? powerUps[powerUps.length-1].x : 500;
+  while (lastX < cameraX + W + 700){
+    lastX += 420 + Math.random()*340;
+    const type = POWERUP_TYPES[Math.floor(Math.random()*POWERUP_TYPES.length)];
+    // a la altura típica de los techos, para que quede en el camino natural del swing
+    const y = groundY - (H*0.28 + Math.random()*H*0.4);
+    powerUps.push({ x:lastX, y, type });
+  }
+  powerUps = powerUps.filter(p => p.x > cameraX - 200);
+}
+
+// distancia mínima de un punto a un segmento (para detectar si la telaraña "roza" algo)
+function pointToSegmentDist(px, py, x1, y1, x2, y2){
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx*dx + dy*dy;
+  let t = lenSq ? ((px-x1)*dx + (py-y1)*dy) / lenSq : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + dx*t, cy = y1 + dy*t;
+  return Math.hypot(px-cx, py-cy);
+}
+
+function applyPowerUp(type){
+  if (type === 'jump'){
+    web.active = false; // corta el swing para que el impulso se aplique limpio
+    player.px = player.x - 15;
+    player.py = player.y + 19;
+    pickupMsg = { text: '¡Súper salto! 🚀', timer: 70 };
+  } else if (type === 'shoot'){
+    // no toca la telaraña: podés seguir colgado y disparando al mismo tiempo
+    player.autoShoot = true;
+    player.autoShootTimer = AUTO_SHOOT_DURATION;
+    pickupMsg = { text: '¡Disparo automático! 🕸️', timer: 70 };
+  } else if (type === 'life'){
+    // no toca la telaraña: si estabas colgado, seguís colgado normalmente
+    player.extraLives++;
+    pickupMsg = { text: '¡Vida extra! Ahora tenés ' + player.extraLives + ' 💫', timer: 70 };
+    updateLifeHud();
+  }
+}
+
+function updateLifeHud(){
+  const el = document.getElementById('lifeIndicator');
+  if (!el) return;
+  if (player.extraLives > 0){
+    el.style.display = 'inline';
+    el.textContent = '💫 x' + player.extraLives;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+// dificultad progresiva: nada al principio, después va apareciendo y cada vez más seguido
+const DIFF = {
+  goblinStart: 300,    // metros desde donde empieza a aparecer el villano volador
+  climberStart: 800,   // metros desde donde empieza a aparecer el trepador mecánico
+  rhinoStart: 1100,    // metros desde donde empieza a aparecer el corredor callejero
+  sandStart: 1500,     // metros desde donde empieza a aparecer la mano de arena
+  scorpionStart: 1900, // metros desde donde empieza a aparecer el francotirador de techo
+  landmarkStart: 500,   // metros desde donde pueden aparecer los edificios temáticos
+  craneStart: 1200,     // metros desde donde empiezan a aparecer las grúas móviles
+  heliStart: 700,       // metros desde donde puede aparecer el helicóptero de ayuda
+};
+
+// villano volador: aparece poco al principio, cada vez más seguido con la distancia
+function ensureEnemies(){
+  if (progressM >= DIFF.goblinStart){
+    let lastX = enemies.length ? enemies[enemies.length-1].x : cameraX + 700;
+    const p = progressM - DIFF.goblinStart;
+    const spacingBase = Math.max(1000, 2600 - p*0.6);
+    const spacingRand = Math.max(600, 1800 - p*0.4);
+    while (lastX < cameraX + W + 900){
+      lastX += spacingBase + Math.random()*spacingRand;
+      const y = groundY - (180 + Math.random()*H*0.4);
+      enemies.push({ x:lastX, y, baseY:y, phase: Math.random()*10, hit:false, counted:false });
+    }
+  }
+  // contar como "esquivado" el que quedó atrás sin chocar, antes de sacarlo de la lista
+  for (const en of enemies){
+    if (!en.hit && !en.counted && en.x < cameraX - 250){
+      en.counted = true;
+      stats.totalEnemiesAvoided++;
+      registerEnemyType('goblin');
+      saveStats();
+    }
+  }
+  enemies = enemies.filter(en => en.x > cameraX - 500);
+}
+
+// trepador mecánico (varios brazos articulados): sube y baja por la fachada
+// de un edificio real, aparece recién pasados los primeros metros y cada vez más rápido/seguido
+function ensureClimbers(){
+  if (progressM >= DIFF.climberStart){
+    const p = progressM - DIFF.climberStart;
+    const spacing = Math.max(900, 2600 - p*0.5); // distancia mínima en x entre trepadores
+    let lastX = climbers.length ? climbers[climbers.length-1].x : -Infinity;
+    for (const b of buildings){
+      if (b.climberChecked) continue;
+      if (b.x > cameraX + W + 900) continue; // todavía no entra en rango, esperar
+      b.climberChecked = true; // ya se evaluó este edificio, no volver a chequear
+      if (b.width < 70) continue;          // necesita algo de fachada para trepar
+      if (b.x - lastX < spacing) continue; // respetar la separación mínima
+      if (Math.random() > 0.6) continue;   // no todos los edificios elegibles tienen uno
+
+      const top = groundY - b.height;
+      const usableH = Math.max(40, Math.min(b.height - 30, H*0.55));
+      const baseY = top + 30 + Math.random() * usableH;
+      const climbRange = Math.min(usableH * 0.4, Math.min(120, 50 + p*0.05));
+      const speed = Math.min(1.4, 0.55 + p*0.0004);
+      climbers.push({
+        x: b.x + b.width*0.5, baseY, climbRange, speed, phase: Math.random()*10,
+        wallTop: top + 12, wallBottom: groundY - 12, hit:false, counted:false
+      });
+      lastX = b.x;
+    }
+  }
+  for (const c of climbers){
+    if (!c.hit && !c.counted && c.x < cameraX - 250){
+      c.counted = true;
+      stats.totalEnemiesAvoided++;
+      registerEnemyType('climber');
+      saveStats();
+    }
+  }
+  climbers = climbers.filter(c => c.x > cameraX - 500);
+}
+
+// mano gigante de arena: emerge del fondo tratando de agarrarte, recién a partir
+// de cierta distancia, y cada vez alcanza más altura y aparece más seguido
+function ensureSandHands(){
+  if (progressM >= DIFF.sandStart){
+    let lastX = sandHands.length ? sandHands[sandHands.length-1].x : cameraX + 1100;
+    const p = progressM - DIFF.sandStart;
+    const spacingBase = Math.max(1400, 3400 - p*0.5);
+    const spacingRand = Math.max(700, 1700 - p*0.3);
+    while (lastX < cameraX + W + 1200){
+      lastX += spacingBase + Math.random()*spacingRand;
+      sandHands.push({ x:lastX, hit:false, counted:false });
+    }
+  }
+  for (const s of sandHands){
+    if (!s.hit && !s.counted && s.x < cameraX - 300){
+      s.counted = true;
+      stats.totalEnemiesAvoided++;
+      registerEnemyType('sandhand');
+      saveStats();
+    }
+  }
+  sandHands = sandHands.filter(s => s.x > cameraX - 600);
+}
+
+// Rhino: corre por la calle a nivel del piso. Si volás "bajito" cerca de la
+// calle te lleva puesto. Aparece más adelante en el recorrido y cada vez más rápido.
+function ensureRhinos(){
+  if (progressM >= DIFF.rhinoStart){
+    let lastX = rhinos.length ? rhinos[rhinos.length-1].spawnX : cameraX + 900;
+    const p = progressM - DIFF.rhinoStart;
+    const spacingBase = Math.max(1300, 3200 - p*0.5);
+    const spacingRand = Math.max(700, 1700 - p*0.3);
+    while (lastX < cameraX + W + 1000){
+      lastX += spacingBase + Math.random()*spacingRand;
+      const speed = Math.min(5.5, 2.3 + p*0.001);
+      rhinos.push({ x:lastX, spawnX:lastX, speed, hit:false, counted:false });
+    }
+  }
+  for (const r of rhinos){
+    if (!r.hit && !r.counted && r.x < cameraX - 250){
+      r.counted = true;
+      stats.totalEnemiesAvoided++;
+      registerEnemyType('rhino');
+      saveStats();
+    }
+  }
+  rhinos = rhinos.filter(r => r.x > cameraX - 400 && r.x < cameraX + W + 2000);
+}
+
+// Escorpión: se queda quieto en un techo y dispara veneno con la cola hacia
+// donde estás. Aparece recién en tramos avanzados y dispara cada vez más seguido.
+function ensureScorpions(){
+  if (progressM >= DIFF.scorpionStart){
+    const p = progressM - DIFF.scorpionStart;
+    const spacing = Math.max(1300, 3200 - p*0.5);
+    let lastX = scorpions.length ? scorpions[scorpions.length-1].x : -Infinity;
+    for (const b of buildings){
+      if (b.scorpionChecked) continue;
+      if (b.x > cameraX + W + 900) continue;
+      b.scorpionChecked = true;
+      if (b.width < 60) continue;
+      if (b.x - lastX < spacing) continue;
+      if (Math.random() > 0.55) continue;
+      const top = groundY - b.height;
+      const baseCooldown = Math.max(65, 210 - p*0.07);
+      scorpions.push({ x: b.x + b.width*0.5, y: top - 4, baseCooldown, cooldown: baseCooldown*0.6, hit:false, counted:false });
+      lastX = b.x;
+    }
+  }
+  for (const s of scorpions){
+    if (!s.hit && !s.counted && s.x < cameraX - 250){
+      s.counted = true;
+      stats.totalEnemiesAvoided++;
+      registerEnemyType('scorpion');
+      saveStats();
+    }
+  }
+  scorpions = scorpions.filter(s => s.x > cameraX - 500 && !s.defeated);
+}
+
+// grúa móvil: la tenaza/gancho se desliza de un lado al otro de la pluma en loop.
+// hay que esperar a que vuelva a estar cerca para poder engancharte y seguir.
+function ensureCranes(){
+  if (progressM >= DIFF.craneStart){
+    let lastX = cranes.length ? cranes[cranes.length-1].baseX : cameraX + 900;
+    const p = progressM - DIFF.craneStart;
+    const spacingBase = Math.max(1500, 3200 - p*0.4);
+    const spacingRand = Math.max(800, 1600 - p*0.25);
+    while (lastX < cameraX + W + 1200){
+      lastX += spacingBase + Math.random()*spacingRand;
+      const jibLength = 170 + Math.random()*100;
+      const y = groundY - (H*0.35 + Math.random()*H*0.25);
+      const speed = 0.32 + Math.random()*0.22; // qué tan rápido va y vuelve
+      cranes.push({ baseX:lastX, jibLength, y, speed, phase: Math.random()*10, hookX:lastX, hookY:y });
+    }
+  }
+  cranes = cranes.filter(c => c.baseX > cameraX - 700 && c.baseX < cameraX + W + 2000);
+}
+
+// función que busca si un punto tocado cae cerca del gancho actual de alguna grúa
+function craneHookAt(worldX, worldY){
+  for (const c of cranes){
+    if (Math.hypot(worldX - c.hookX, worldY - c.hookY) < 26) return c;
+  }
+  return null;
+}
+
+// helicóptero de ayuda: aparece muy de vez en cuando; si te enganchás, te lleva
+// volando rápido unos segundos y después se eleva y te suelta a seguir por tu cuenta.
+function ensureHelicopter(){
+  if (helicopters.length > 0) return; // solo uno a la vez en pantalla
+  if (progressM < DIFF.heliStart) return;
+  if (!nextHeliAt) nextHeliAt = DIFF.heliStart + 900 + Math.random()*700;
+  if (progressM < nextHeliAt) return;
+  helicopters.push({
+    x: cameraX + W + 150, y: groundY - H*0.62,
+    speed: 1.6, state: 'flying', // 'flying' | 'riding' | 'leaving'
+    rideTimer: 0
+  });
+  nextHeliAt = progressM + 2600 + Math.random()*1800; // el próximo, bastante más adelante
+}
+
+function buildingAt(worldX, worldY){
+  const pad = 16; // margen de tolerancia para que sea más fácil apuntar
+  for (const b of buildings){
+    if (worldX >= b.x - pad && worldX <= b.x + b.width + pad &&
+        worldY >= groundY - b.height - pad && worldY <= groundY){
+      return b;
+    }
+  }
+  return null;
+}
+
+// ---------- input ----------
+function worldFromClient(clientX, clientY){
+  return { x: clientX + cameraX, y: clientY };
+}
+
+function heliAt(worldX, worldY){
+  for (const h of helicopters){
+    if (h.state === 'flying' && Math.hypot(worldX - h.x, worldY - h.y) < 34) return h;
+  }
+  return null;
+}
+
+function tryShootWeb(clientX, clientY){
+  if (player.riding) return; // ocupado viajando en el helicóptero
+  const p = worldFromClient(clientX, clientY);
+  const dx = p.x - player.x, dy = p.y - player.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist > MAX_WEB){
+    missMarker = { x: p.x, y: p.y, timer: 26 };
+    webThrow = { fromX: player.x, fromY: player.y, toX: p.x, toY: p.y, timer: 9 };
+    return;
+  }
+
+  const heli = heliAt(p.x, p.y);
+  if (heli){
+    heli.state = 'riding';
+    heli.rideTimer = 260;
+    player.riding = heli;
+    web.active = false;
+    pickupMsg = { text: '¡Enganchado al helicóptero! 🚁', timer: 70 };
+    return;
+  }
+
+  const crane = craneHookAt(p.x, p.y);
+  const target = dist >= 10 ? buildingAt(p.x, p.y) : null;
+  // engancha si hay un edificio justo ahí (por debajo de su techo, no desde arriba) o el gancho de una grúa
+  if ((target && player.y > groundY - target.height) || crane){
+    web.active = true;
+    web.anchor = { x: p.x, y: p.y };
+    web.len = dist;
+    web.baseLen = dist;
+    player.grounded = false;
+  } else {
+    // tiro fallido: no hay nada ahí (o estás arriba del techo) — se ve la X y la
+    // telaraña sale disparada hacia ese punto pero no engancha en ningún lado
+    missMarker = { x: p.x, y: p.y, timer: 26 };
+    webThrow = { fromX: player.x, fromY: player.y, toX: p.x, toY: p.y, timer: 9 };
+  }
+}
+function releaseWeb(){ web.active = false; }
+
+let pointerDown = false;
+canvas.addEventListener('pointerdown', e => {
+  pointerDown = true;
+  if (player.grounded){
+    // se deja caer del edificio, sin impulso: la física de caída libre hace el resto
+    player.grounded = false;
+    canLand = false;
+  }
+  tryShootWeb(e.clientX, e.clientY);
+});
+addEventListener('pointerup', () => { pointerDown = false; releaseWeb(); });
+addEventListener('pointermove', e => {
+  if (pointerDown) { /* mantiene el web actual, no reapunta hasta soltar */ }
+  mouseX = e.clientX; mouseY = e.clientY;
+});
+// bloqueo extra de los gestos táctiles nativos del canvas: en iOS Safari, mantener
+// presionado puede disparar la lupa de selección de texto aunque haya touch-action/user-select
+// en el CSS; interceptando el evento táctil crudo se evita por completo.
+canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+canvas.addEventListener('touchend', e => e.preventDefault(), { passive: false });
+
+// en PC, la ruedita del mouse alarga/achica la telaraña mientras estás colgado
+canvas.addEventListener('wheel', e => {
+  if (web.active && web.baseLen){
+    e.preventDefault();
+    const dir = e.deltaY < 0 ? 1 : -1; // arriba = alarga, abajo = achica
+    const proposed = web.len + dir*6;
+    web.len = Math.max(web.baseLen - ROPE_ADJUST_RANGE, Math.min(web.baseLen + ROPE_ADJUST_RANGE, proposed));
+  }
+}, { passive: false });
+let mouseX = W/2, mouseY = H/2;
+let prevMouseX = mouseX, prevMouseY = mouseY;
+const ROPE_ADJUST_RANGE = 55; // cuánto se puede alargar/achicar como máximo desde el enganche original
+
+addEventListener('keydown', e => {
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+  if (e.code === 'Space' || e.code === 'ArrowUp'){
+    if (player.grounded){
+      player.py = player.y - JUMP_VY;
+      player.grounded = false;
+      canLand = false;
+    }
+  }
+  if (e.code === 'Enter' && gameOver) restart();
+  if ((e.code === 'Escape' || e.code === 'KeyP') && !gameOver) togglePause();
+});
+addEventListener('keyup', e => {
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+});
+
+document.getElementById('restartBtn').addEventListener('click', restart);
+document.getElementById('menuFromDeathBtn').addEventListener('click', () => {
+  document.getElementById('overlay').classList.remove('show');
+  showMenu();
+});
+document.getElementById('startBtn').addEventListener('click', () => {
+  document.getElementById('startOverlay').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('hint').style.display = 'block';
+  document.getElementById('pauseBtn').style.display = 'flex';
+  paused = false;
+  initGame();
+  if (!running){ running = true; requestAnimationFrame(loop); }
+});
+
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
+document.getElementById('resumeBtn').addEventListener('click', togglePause);
+document.getElementById('restartFromPauseBtn').addEventListener('click', () => {
+  paused = false;
+  document.getElementById('pauseOverlay').classList.remove('show');
+  restart();
+});
+document.getElementById('menuBtn').addEventListener('click', showMenu);
+
+function togglePause(){
+  if (gameOver) return;
+  paused = !paused;
+  document.getElementById('pauseOverlay').classList.toggle('show', paused);
+}
+
+function showMenu(){
+  paused = false;
+  gameOver = true; // congela la física mientras se ve el menú
+  document.getElementById('pauseOverlay').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('hint').style.display = 'none';
+  document.getElementById('pauseBtn').style.display = 'none';
+  document.getElementById('startOverlay').style.display = 'flex';
+  renderSkinPicker();
+}
+
+function restart(){
+  initGame();
+}
+
+// ---------- física / update ----------
+function update(){
+  if (gameOver) return;
+
+  elapsedFrames++; // avanza el ciclo del día mientras se juega
+  const cycleIndex = Math.floor(elapsedFrames / DAY_CYCLE_FRAMES);
+  if (cycleIndex > lastCycleIndex){
+    stats.totalDayCycles += (cycleIndex - lastCycleIndex);
+    lastCycleIndex = cycleIndex;
+    saveStats();
+  }
+
+  // metros de progreso: gobierna la dificultad (frecuencia/agresividad de enemigos)
+  progressM = Math.max(progressM, Math.floor((player.x - startBuilding.x) / 10));
+
+  let vx = player.x - player.px;
+  let vy = player.y - player.py;
+
+  if (player.riding){
+    // "paseo" en helicóptero: seguís su posición directamente, sin gravedad ni péndulo
+    const h = player.riding;
+    player.px = player.x; player.py = player.y;
+    player.x = h.x - 10;
+    player.y = h.y + 22;
+    player.facing = 1;
+  } else {
+  player.px = player.x;
+  player.py = player.y;
+
+  vx *= DAMPING; vy *= DAMPING;
+
+  let ax = 0, ay = GRAVITY;
+  if (!web.active && !player.grounded){
+    if (keys.left) ax -= AIR_CONTROL;
+    if (keys.right) ax += AIR_CONTROL;
+  }
+  if (player.grounded){
+    ay = 0; vy = 0;
+    if (keys.left) player.x -= 4;
+    if (keys.right) player.x += 4;
+  }
+
+  // "bombeo" del swing: mover el mouse/dedo para los costados mientras estás colgado
+  // suma un empujoncito lateral chico — pensado solo para destrabarte si quedaste
+  // sin avanzar, no para ganar velocidad real (por eso el tope duro más abajo)
+  if (web.active && pointerDown){
+    const mouseDX = mouseX - prevMouseX;
+    const target = Math.max(-6, Math.min(6, mouseDX)) * 0.022;
+    pumpVel += (target - pumpVel) * 0.1;
+  } else {
+    pumpVel *= 0.9; // se apaga solo al soltar o cuando no está colgado
+  }
+  pumpVel = Math.max(-0.18, Math.min(0.18, pumpVel)); // tope duro: ayuda a destrabar, no a impulsarte lejos
+  ax += pumpVel;
+  prevMouseX = mouseX;
+
+  // largo de telaraña ajustable arrastrando el dedo: arriba alarga, abajo achica
+  // (rango chico alrededor del largo con el que enganchaste, no de punta a punta)
+  if (web.active && pointerDown && web.baseLen){
+    const mouseDY = mouseY - prevMouseY;
+    const proposed = web.len - mouseDY * 0.18;
+    web.len = Math.max(web.baseLen - ROPE_ADJUST_RANGE, Math.min(web.baseLen + ROPE_ADJUST_RANGE, proposed));
+  }
+  prevMouseY = mouseY;
+
+  player.x += vx + ax;
+  player.y += vy + ay;
+
+  if (vx > 0.05) player.facing = 1;
+  if (vx < -0.05) player.facing = -1;
+
+  // restricción de la telaraña (verlet constraint)
+  if (web.active){
+    const dx = player.x - web.anchor.x;
+    const dy = player.y - web.anchor.y;
+    const dist = Math.hypot(dx, dy) || 0.0001;
+    const diff = (dist - web.len) / dist;
+    player.x -= dx * diff;
+    player.y -= dy * diff;
+  }
+  } // fin del bloque de física normal (else de player.riding)
+
+  // altura máxima alcanzada en esta partida (para el logro de altura)
+  sessionMaxHeightPx = Math.max(sessionMaxHeightPx, groundY - player.y);
+
+  // recolectar power-ups flotantes: con el cuerpo, o con el hilo de la telaraña
+  // mientras está tendida (así no hace falta apuntar el cuerpo exacto a la skill)
+  for (let i = powerUps.length - 1; i >= 0; i--){
+    const p = powerUps[i];
+    let touched = Math.hypot(player.x - p.x, player.y - p.y) < player.radius + 17;
+    if (!touched && web.active){
+      touched = pointToSegmentDist(p.x, p.y, player.x, player.y, web.anchor.x, web.anchor.y) < 17;
+    }
+    if (touched){
+      applyPowerUp(p.type);
+      powerUps.splice(i, 1);
+      stats.totalPowerUps++;
+      saveStats();
+    }
+  }
+  if (pickupMsg){
+    pickupMsg.timer--;
+    if (pickupMsg.timer <= 0) pickupMsg = null;
+  }
+  if (missMarker){
+    missMarker.timer--;
+    if (missMarker.timer <= 0) missMarker = null;
+  }
+  if (webThrow){
+    webThrow.timer--;
+    if (webThrow.timer <= 0) webThrow = null;
+  }
+
+  // disparo automático (power-up de "disparo"): mientras esté activo, busca un
+  // enemigo visible en pantalla y solo dispara cuando encuentra uno, apuntando a él
+  function findAutoShootTarget(){
+    let best = null, bestDist = Infinity;
+    const consider = (x, y) => {
+      if (x < cameraX - 60 || x > cameraX + W + 60) return; // tiene que estar a la vista
+      const d = Math.hypot(x - player.x, y - player.y);
+      if (d < bestDist){ bestDist = d; best = { x, y }; }
+    };
+    for (const en of enemies) if (!en.hit) consider(en.drawX !== undefined ? en.drawX : en.x, en.y);
+    for (const c of climbers) if (!c.hit) consider(c.x, c.y);
+    for (const r of rhinos) if (!r.hit) consider(r.x, groundY - 40);
+    for (const s of sandHands) if (!s.hit && s.heightFactor > 0.3) consider(s.x, s.topY);
+    for (const s of scorpions) if (!s.hit) consider(s.x, s.y);
+    return best;
+  }
+
+  if (player.autoShoot){
+    player.autoShootTimer--;
+    if (player.autoShootTimer <= 0){
+      player.autoShoot = false;
+    } else if (player.shootCooldown > 0){
+      player.shootCooldown--;
+    } else {
+      const tgt = findAutoShootTarget();
+      if (tgt){
+        player.shootCooldown = AUTO_SHOOT_COOLDOWN;
+        const dx = tgt.x - player.x, dy = tgt.y - player.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const speed = 9;
+        webShots.push({ x: player.x, y: player.y, vx: dx/d*speed, vy: dy/d*speed, life: 90 });
+      }
+      // si no hay ningún enemigo a la vista, no dispara — vuelve a chequear el próximo frame
+    }
+  }
+
+  // busca el primer enemigo vivo cerca de un punto y lo derrota (usado por el disparo automático)
+  function tryDefeatNear(x, y, radius){
+    for (const en of enemies){
+      const ex = en.drawX !== undefined ? en.drawX : en.x;
+      if (!en.hit && Math.hypot(x - ex, y - en.y) < radius + 12){
+        en.hit = true; en.defeated = true;
+        registerEnemyType('goblin'); stats.enemiesDefeated++; saveStats();
+        return true;
+      }
+    }
+    for (const c of climbers){
+      if (!c.hit && Math.hypot(x - c.x, y - c.y) < radius + 18){
+        c.hit = true; c.defeated = true;
+        registerEnemyType('climber'); stats.enemiesDefeated++; saveStats();
+        return true;
+      }
+    }
+    for (const r of rhinos){
+      if (!r.hit && Math.hypot(x - r.x, y - (groundY - 20)) < radius + 30){
+        r.hit = true; r.defeated = true;
+        registerEnemyType('rhino'); stats.enemiesDefeated++; saveStats();
+        return true;
+      }
+    }
+    for (const s of sandHands){
+      if (!s.hit && s.heightFactor > 0.3 && Math.hypot(x - s.x, y - s.topY) < radius + 25){
+        s.hit = true; s.defeated = true;
+        registerEnemyType('sandhand'); stats.enemiesDefeated++; saveStats();
+        return true;
+      }
+    }
+    for (const s of scorpions){
+      if (!s.hit && Math.hypot(x - s.x, y - s.y) < radius + 16){
+        s.hit = true; s.defeated = true;
+        registerEnemyType('scorpion'); stats.enemiesDefeated++; saveStats();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  for (let i = webShots.length - 1; i >= 0; i--){
+    const w = webShots[i];
+    w.x += w.vx; w.y += w.vy;
+    w.life--;
+    if (tryDefeatNear(w.x, w.y, 14) || w.life <= 0 ||
+        w.x < cameraX - 100 || w.x > cameraX + W + 200){
+      webShots.splice(i, 1);
+    }
+  }
+
+  // resuelve el golpe con cualquier enemigo: usa una vida extra si hay, si no termina la partida
+  function resolveEnemyHit(defeatMsg, failTitle){
+    if (player.extraLives > 0){
+      player.extraLives--;
+      stats.extraLifeUses++;
+      stats.enemiesDefeated++;
+      saveStats();
+      player.py = player.y + 24;
+      player.px = player.x - 12;
+      pickupMsg = { text: defeatMsg, timer: 70 };
+      updateLifeHud();
+      return true; // derrotado: hay que sacarlo del mapa
+    } else {
+      deathTitle = failTitle;
+      triggerGameOver();
+      return false;
+    }
+  }
+
+  // movimiento del villano volador (hover con leve desplazamiento) y choque
+  const t = Date.now() / 1000;
+  for (const en of enemies){
+    en.y = en.baseY + Math.sin(t*0.8 + en.phase) * 26;
+    en.drawX = en.x + Math.sin(t*0.5 + en.phase) * 40;
+    if (!en.hit && Math.hypot(player.x - en.drawX, player.y - en.y) < player.radius + 15){
+      en.hit = true;
+      registerEnemyType('goblin');
+      if (resolveEnemyHit('¡Derrotaste al villano! 💫', '🦹 El villano volador te atrapó')) en.defeated = true;
+    }
+  }
+  enemies = enemies.filter(en => !en.defeated);
+
+  // movimiento del trepador mecánico (sube y baja por la fachada) y choque
+  for (const c of climbers){
+    const raw = c.baseY + Math.sin(t*c.speed + c.phase) * c.climbRange;
+    c.y = Math.max(c.wallTop, Math.min(c.wallBottom, raw));
+    if (!c.hit && Math.hypot(player.x - c.x, player.y - c.y) < player.radius + 26){
+      c.hit = true;
+      registerEnemyType('climber');
+      if (resolveEnemyHit('¡Esquivaste al trepador! 💫', '🦾 El trepador mecánico te atrapó')) c.defeated = true;
+    }
+  }
+  climbers = climbers.filter(c => !c.defeated);
+
+  // mano gigante de arena: se alza cuando estás cerca de su posición y vuelve a bajar
+  const sandMaxReach = Math.min(H*0.85, H*0.5 + Math.max(0, progressM - DIFF.sandStart) * 0.05);
+  for (const s of sandHands){
+    const local = Math.max(0, Math.min(1, (player.x - (s.x - 150)) / 300));
+    s.heightFactor = Math.sin(local * Math.PI);
+    s.topY = groundY - s.heightFactor * sandMaxReach;
+    if (!s.hit && s.heightFactor > 0.3 && Math.abs(player.x - s.x) < 55 && player.y >= s.topY - 12){
+      s.hit = true;
+      registerEnemyType('sandhand');
+      if (resolveEnemyHit('¡Te escapaste de la mano de arena! 💫', '✋ La mano de arena te atrapó')) s.defeated = true;
+    }
+  }
+  sandHands = sandHands.filter(s => !s.defeated);
+
+  // Rhino: corre por la calle; si volás cerca del piso te lleva puesto
+  const rhinoZone = Math.min(150, 75 + Math.max(0, progressM - DIFF.rhinoStart) * 0.03);
+  for (const r of rhinos){
+    r.x += r.speed;
+    if (!r.hit && Math.abs(player.x - r.x) < 44 && player.y > groundY - rhinoZone){
+      r.hit = true;
+      registerEnemyType('rhino');
+      if (resolveEnemyHit('¡Esquivaste a Rhino! 💫', '🦏 Rhino te llevó puesto')) r.defeated = true;
+    }
+  }
+  rhinos = rhinos.filter(r => !r.defeated);
+
+  // Escorpión: quieto en un techo, dispara veneno con la cola hacia el jugador
+  for (const s of scorpions){
+    if (Math.abs(player.x - s.x) < 750){
+      s.cooldown--;
+      if (s.cooldown <= 0){
+        s.cooldown = s.baseCooldown;
+        registerEnemyType('scorpion');
+        const dx = player.x - s.x, dy = player.y - s.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const speed = 6.5;
+        poisonBolts.push({ x:s.x, y:s.y, vx: dx/dist*speed, vy: dy/dist*speed - 1.4 });
+      }
+    }
+  }
+  for (let i = poisonBolts.length - 1; i >= 0; i--){
+    const p = poisonBolts[i];
+    p.vy += 0.1;
+    p.x += p.vx; p.y += p.vy;
+    if (Math.hypot(player.x - p.x, player.y - p.y) < player.radius + 8){
+      poisonBolts.splice(i, 1);
+      resolveEnemyHit('¡Esquivaste el veneno! 💫', '🦂 El veneno de Escorpión te alcanzó');
+      continue;
+    }
+    if (p.x < cameraX - 100 || p.x > cameraX + W + 100 || p.y > groundY + 40){
+      poisonBolts.splice(i, 1);
+    }
+  }
+
+  // grúas móviles: el gancho se desliza de un extremo al otro de la pluma
+  for (const c of cranes){
+    const sway = Math.sin(t * c.speed + c.phase) * 0.5 + 0.5;
+    c.hookX = c.baseX + sway * c.jibLength;
+    c.hookY = c.y;
+  }
+
+  // helicóptero de ayuda: vuela, y si te enganchaste te lleva rápido unos segundos
+  for (const h of helicopters){
+    if (h.state === 'flying'){
+      h.x += h.speed;
+    } else if (h.state === 'riding'){
+      h.x += 6.2; // te lleva bastante más rápido que un swing normal
+      h.rideTimer--;
+      if (h.rideTimer <= 0){
+        h.state = 'leaving';
+        player.riding = null;
+      }
+    } else if (h.state === 'leaving'){
+      h.x += 3.5;
+      h.y -= 3.2; // se eleva y se aleja
+    }
+  }
+  helicopters = helicopters.filter(h => h.y < groundY + 100 && h.x < cameraX + W + 900 && h.x > cameraX - 900);
+
+  // colisión con el techo del edificio inicial (único lugar donde se puede aterrizar)
+  player.grounded = false;
+  if (canLand){
+    const b = startBuilding;
+    const top = groundY - b.height;
+    const withinX = player.x + player.radius*0.6 > b.x && player.x - player.radius*0.6 < b.x + b.width;
+    if (withinX && player.y + player.radius >= top && player.y + player.radius <= top + 22 && (player.y - player.py) >= -1){
+      player.y = top - player.radius;
+      player.py = player.y;
+      player.grounded = true;
+      web.active = false;
+    }
+  }
+
+  // muerte: tocar el piso (salvo que tengamos vida extra, ahí rebota)
+  if (player.y + player.radius >= groundY){
+    if (player.extraLives > 0){
+      player.extraLives--;
+      stats.extraLifeUses++;
+      saveStats();
+      player.y = groundY - player.radius - 4;
+      player.py = player.y + 26; // impulso hacia arriba, rebote real
+      player.px = player.x - 8;
+      pickupMsg = { text: '¡Rebote! Seguís en juego 💫', timer: 70 };
+      updateLifeHud();
+    } else {
+      player.y = groundY - player.radius;
+      deathTitle = '💥 Tocaste el piso';
+      triggerGameOver();
+    }
+  }
+
+  // la cámara sigue al jugador en las dos direcciones (no solo hacia adelante),
+  // así nunca queda afuera de pantalla al balancearse para atrás
+  const camTarget = Math.max(startBuilding.x - 120, player.x - W*0.35);
+  cameraX += (camTarget - cameraX) * 0.18;
+  ensureBuildings();
+
+  // registrar los edificios temáticos que ya pasaste (para los logros de Nueva York)
+  for (const b of buildings){
+    if (b.landmark && !b.landmarkCounted && player.x > b.x + b.width){
+      b.landmarkCounted = true;
+      stats.landmarkCounts[b.landmark] = (stats.landmarkCounts[b.landmark] || 0) + 1;
+      saveStats();
+    }
+  }
+
+  ensurePowerUps();
+  ensureEnemies();
+  ensureClimbers();
+  ensureSandHands();
+  ensureRhinos();
+  ensureScorpions();
+  ensureCranes();
+  ensureHelicopter();
+
+  score = Math.max(score, Math.floor((player.x - startBuilding.x) / 10));
+  document.getElementById('score').textContent = score;
+  if (score > best){ best = score; document.getElementById('best').textContent = best; }
+}
+
+function triggerGameOver(){
+  if (gameOver) return;
+  gameOver = true;
+  web.active = false;
+  document.getElementById('deathTitle').textContent = deathTitle;
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('overlay').classList.add('show');
+
+  const heightMeters = Math.floor(sessionMaxHeightPx / 10);
+  const isNewRecord = score > stats.bestDistance;
+  stats.bestDistance = Math.max(stats.bestDistance, score);
+  stats.bestHeight = Math.max(stats.bestHeight, heightMeters);
+  saveStats();
+
+  const recordEl = document.getElementById('recordLine');
+  recordEl.textContent = isNewRecord
+    ? '🏆 ¡Nuevo récord en este dispositivo!'
+    : 'Tu récord en este dispositivo: ' + stats.bestDistance + ' m';
+}
+
+// ---------- render ----------
+// ---------- ciclo del día ----------
+const DAY_CYCLE_FRAMES = 60 * 260; // ciclo completo ~260s (lento, se nota avanzar pero no marea)
+
+function lerpHex(a, b, t){
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ar=(pa>>16)&255, ag=(pa>>8)&255, ab=pa&255;
+  const br=(pb>>16)&255, bg=(pb>>8)&255, bb=pb&255;
+  const r = Math.round(ar+(br-ar)*t), g = Math.round(ag+(bg-ag)*t), b2 = Math.round(ab+(bb-ab)*t);
+  return `rgb(${r},${g},${b2})`;
+}
+
+const SKY_FRAMES = [
+  { p:0.00, top:'#f4a259', mid:'#e08a5c', low:'#f7c893', horizon:'#ffe3b0', sun:true },  // amanecer
+  { p:0.28, top:'#3a7bd5', mid:'#6dc0e0', low:'#bfe8f0', horizon:'#eaf8fb', sun:true },  // día
+  { p:0.52, top:'#2b1055', mid:'#6a3a7a', low:'#e0724f', horizon:'#f4a259', sun:true },  // atardecer
+  { p:0.75, top:'#050914', mid:'#0d1633', low:'#141d3d', horizon:'#1f2a52', sun:false }, // noche
+  { p:1.00, top:'#f4a259', mid:'#e08a5c', low:'#f7c893', horizon:'#ffe3b0', sun:true },  // vuelve al amanecer
+];
+
+function getSkyState(){
+  const cyclePos = (elapsedFrames % DAY_CYCLE_FRAMES) / DAY_CYCLE_FRAMES;
+  let a = SKY_FRAMES[0], b = SKY_FRAMES[SKY_FRAMES.length - 1];
+  for (let i = 0; i < SKY_FRAMES.length - 1; i++){
+    if (cyclePos >= SKY_FRAMES[i].p && cyclePos <= SKY_FRAMES[i+1].p){
+      a = SKY_FRAMES[i]; b = SKY_FRAMES[i+1];
+      break;
+    }
+  }
+  const span = (b.p - a.p) || 1;
+  const t = (cyclePos - a.p) / span;
+  return {
+    top: lerpHex(a.top, b.top, t), mid: lerpHex(a.mid, b.mid, t),
+    low: lerpHex(a.low, b.low, t), horizon: lerpHex(a.horizon, b.horizon, t),
+    isNight: !a.sun && !b.sun, cyclePos
+  };
+}
+
+function drawSky(){
+  const sky = getSkyState();
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, sky.top);
+  grad.addColorStop(0.45, sky.mid);
+  grad.addColorStop(0.75, sky.low);
+  grad.addColorStop(1, sky.horizon);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,W,H);
+
+  // el sol y la luna recorren un arco a lo largo del ciclo del día
+  const isSunHalf = sky.cyclePos < 0.5;
+  const local = isSunHalf ? sky.cyclePos/0.5 : (sky.cyclePos-0.5)/0.5;
+  const arcH = Math.sin(local * Math.PI);
+  const cx = local * (W*1.3) - W*0.15;
+  const cy = H*0.16 + (1-arcH) * H*0.24;
+
+  if (isSunHalf){
+    ctx.beginPath(); ctx.arc(cx, cy, 50, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,214,150,.5)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 24, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,240,210,.85)'; ctx.fill();
+  } else {
+    // estrellas, más visibles cuanto más alta está la luna
+    ctx.fillStyle = `rgba(255,255,255,${0.15 + arcH*0.55})`;
+    for (let i = 0; i < 40; i++){
+      const sxp = (i*137) % W;
+      const syp = (i*59) % (H*0.55);
+      ctx.beginPath(); ctx.arc(sxp, syp, 1.1, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(cx, cy, 32, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(210,220,255,.3)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 19, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(235,240,255,.9)'; ctx.fill();
+  }
+
+  // silueta lejana (parallax) — más oscura de noche
+  ctx.fillStyle = sky.isNight ? 'rgba(5,5,15,.65)' : 'rgba(20,10,35,.55)';
+  const parX = -((cameraX*0.25) % 260);
+  for (let i=-1; i<W/260+2; i++){
+    const bx = parX + i*260;
+    const bh = 90 + ((i*97)%140);
+    ctx.fillRect(bx, groundY-bh, 170, bh);
+  }
+}
+
+function drawGround(){
+  ctx.fillStyle = '#141018';
+  ctx.fillRect(0, groundY, W, H-groundY);
+  ctx.strokeStyle = 'rgba(255,255,80,.55)';
+  ctx.lineWidth = 4;
+  ctx.setLineDash([28,20]);
+  ctx.beginPath();
+  ctx.moveTo(0, groundY+18);
+  ctx.lineTo(W, groundY+18);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawGenericBuilding(sx, top, b, windowColor){
+  ctx.fillStyle = '#241a33';
+  ctx.fillRect(sx, top, b.width, b.height);
+  ctx.fillStyle = windowColor;
+  const cols = Math.max(2, Math.floor(b.width/26));
+  const rows = Math.max(2, Math.floor(b.height/30));
+  for (let r=0;r<rows;r++){
+    for (let c=0;c<cols;c++){
+      if ((r*cols+c + Math.floor(b.x)) % 3 === 0) continue;
+      const wx = sx + 8 + c*(b.width-16)/cols;
+      const wy = top + 10 + r*(b.height-20)/rows;
+      ctx.fillRect(wx, wy, 8, 10);
+    }
+  }
+}
+
+function drawEmpireLandmark(sx, top, b, windowColor){
+  // torre escalonada tipo art-deco con antena, referencia al Empire State
+  const w = b.width;
+  ctx.fillStyle = '#4a4d57';
+  ctx.fillRect(sx, top + b.height*0.18, w, b.height*0.82);
+  ctx.fillStyle = '#5b5e69';
+  ctx.fillRect(sx + w*0.14, top + b.height*0.06, w*0.72, b.height*0.16);
+  ctx.fillRect(sx + w*0.28, top - b.height*0.03, w*0.44, b.height*0.12);
+  // antena
+  ctx.strokeStyle = '#8a8d97';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(sx + w*0.5, top - b.height*0.03);
+  ctx.lineTo(sx + w*0.5, top - b.height*0.14);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,120,90,.9)';
+  ctx.beginPath(); ctx.arc(sx + w*0.5, top - b.height*0.14, 2.5, 0, Math.PI*2); ctx.fill();
+  // ventanas
+  ctx.fillStyle = windowColor;
+  const cols = Math.max(3, Math.floor(w/20));
+  const rows = Math.max(4, Math.floor(b.height*0.82/26));
+  for (let r=0;r<rows;r++){
+    for (let c=0;c<cols;c++){
+      if ((r*cols+c) % 3 === 0) continue;
+      const wx = sx + 6 + c*(w-12)/cols;
+      const wy = top + b.height*0.2 + r*(b.height*0.78)/rows;
+      ctx.fillRect(wx, wy, 6, 8);
+    }
+  }
+}
+
+function drawWtcLandmark(sx, top, b, windowColor){
+  // aguja de vidrio esbelta, referencia al One World Trade Center
+  const w = b.width;
+  const grad = ctx.createLinearGradient(sx, top, sx, groundY);
+  grad.addColorStop(0, '#bfe6ff');
+  grad.addColorStop(1, '#3d5a72');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(sx + w*0.5, top);
+  ctx.lineTo(sx + w, top + b.height*0.1);
+  ctx.lineTo(sx + w, groundY);
+  ctx.lineTo(sx, groundY);
+  ctx.lineTo(sx, top + b.height*0.1);
+  ctx.closePath();
+  ctx.fill();
+  // facetas
+  ctx.strokeStyle = 'rgba(255,255,255,.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(sx + w*0.5, top); ctx.lineTo(sx + w*0.5, groundY); ctx.stroke();
+  // antena
+  ctx.strokeStyle = '#cfd8e0'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(sx + w*0.5, top);
+  ctx.lineTo(sx + w*0.5, top - b.height*0.1);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,120,90,.9)';
+  ctx.beginPath(); ctx.arc(sx + w*0.5, top - b.height*0.1, 2.2, 0, Math.PI*2); ctx.fill();
+}
+
+function drawTimesLandmark(sx, top, b, windowColor, t){
+  // fachada llena de carteles de neón, referencia a Times Square
+  ctx.fillStyle = '#1a1622';
+  ctx.fillRect(sx, top, b.width, b.height);
+  const neonColors = ['#ff2d6d','#3ddcff','#ffe14d','#5dff8f','#c86dff'];
+  let seed = Math.floor(b.x);
+  for (let i = 0; i < 6; i++){
+    seed = (seed*9301 + 49297) % 233280;
+    const bw = 40 + (seed % 60);
+    seed = (seed*9301 + 49297) % 233280;
+    const bh = 24 + (seed % 40);
+    seed = (seed*9301 + 49297) % 233280;
+    const bx = sx + 6 + (seed % Math.max(1, b.width - bw - 12));
+    seed = (seed*9301 + 49297) % 233280;
+    const by = top + 10 + (seed % Math.max(1, b.height - bh - 20));
+    const color = neonColors[i % neonColors.length];
+    const flicker = 0.55 + Math.sin(t*2.5 + i*1.7 + b.x) * 0.2;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = flicker;
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.globalAlpha = 1;
+  }
+  ctx.fillStyle = windowColor;
+  ctx.globalAlpha = 0.5;
+  const cols = Math.max(2, Math.floor(b.width/26));
+  const rows = Math.max(2, Math.floor(b.height/30));
+  for (let r=0;r<rows;r++){
+    for (let c=0;c<cols;c++){
+      if ((r*cols+c + Math.floor(b.x)) % 4 !== 0) continue;
+      const wx = sx + 8 + c*(b.width-16)/cols;
+      const wy = top + 10 + r*(b.height-20)/rows;
+      ctx.fillRect(wx, wy, 6, 8);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawBuildings(){
+  const sky = getSkyState();
+  // de noche las ventanas brillan más cálidas; de día quedan más apagadas
+  const windowColor = sky.isNight ? 'rgba(255,214,130,.95)' : 'rgba(255,210,120,.5)';
+  const t = Date.now() / 1000;
+  for (const b of buildings){
+    const sx = b.x - cameraX;
+    if (sx + b.width < -20 || sx > W+20) continue;
+    const top = groundY - b.height;
+    if (b.landmark === 'empire') drawEmpireLandmark(sx, top, b, windowColor);
+    else if (b.landmark === 'wtc') drawWtcLandmark(sx, top, b, windowColor);
+    else if (b.landmark === 'times') drawTimesLandmark(sx, top, b, windowColor, t);
+    else drawGenericBuilding(sx, top, b, windowColor);
+  }
+}
+
+function drawWeb(){
+  if (web.active){
+    ctx.strokeStyle = 'rgba(255,255,255,.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(player.x - cameraX, player.y);
+    ctx.lineTo(web.anchor.x - cameraX, web.anchor.y);
+    ctx.stroke();
+  } else if (pointerDown === false){
+    // mira de puntería
+    const dist = Math.hypot(mouseX - (player.x-cameraX), mouseY - player.y);
+    if (dist < MAX_WEB){
+      ctx.strokeStyle = 'rgba(255,255,255,.25)';
+      ctx.setLineDash([4,6]);
+      ctx.beginPath();
+      ctx.moveTo(player.x-cameraX, player.y);
+      ctx.lineTo(mouseX, mouseY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+}
+
+function drawMissMarker(){
+  if (webThrow){
+    const alpha = Math.max(0, webThrow.timer / 9);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = 'rgba(255,255,255,.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(webThrow.fromX - cameraX, webThrow.fromY);
+    ctx.lineTo(webThrow.toX - cameraX, webThrow.toY);
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (missMarker){
+    const sx = missMarker.x - cameraX, sy = missMarker.y;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, missMarker.timer / 26);
+    ctx.strokeStyle = '#ff4d4d';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(sx - 9, sy - 9); ctx.lineTo(sx + 9, sy + 9);
+    ctx.moveTo(sx + 9, sy - 9); ctx.lineTo(sx - 9, sy + 9);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawPlayer(){
+  const px = player.x - cameraX, py = player.y;
+  const dir = player.facing;
+  const skin = SKINS[selectedSkin];
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.lineCap = 'round';
+
+  // piernas
+  ctx.strokeStyle = skin.legs;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(0, 3); ctx.lineTo(-6*dir, 20);
+  ctx.moveTo(0, 3); ctx.lineTo(8*dir, 18);
+  ctx.stroke();
+
+  // torso
+  ctx.fillStyle = skin.torso;
+  ctx.beginPath();
+  ctx.ellipse(0, -4, 8, 11, 0, 0, Math.PI*2);
+  ctx.fill();
+  // franja lateral (color de acento)
+  ctx.strokeStyle = skin.accent;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-6*dir, -12); ctx.lineTo(-2*dir, 4);
+  ctx.stroke();
+
+  // brazos - uno estirado hacia el punto de la telaraña, o apuntando al disparar solo
+  ctx.strokeStyle = skin.torso;
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  if (web.active && web.anchor){
+    const ang = Math.atan2(web.anchor.y - player.y, web.anchor.x - player.x);
+    ctx.moveTo(0, -8);
+    ctx.lineTo(Math.cos(ang)*17, -8 + Math.sin(ang)*17);
+    ctx.moveTo(0, -8); ctx.lineTo(-9*dir, -13);
+  } else if (player.autoShoot){
+    ctx.moveTo(0, -8); ctx.lineTo(17*dir, -9);
+    ctx.moveTo(0, -8); ctx.lineTo(-9*dir, -13);
+  } else {
+    ctx.moveTo(0, -8); ctx.lineTo(10*dir, -16);
+    ctx.moveTo(0, -8); ctx.lineTo(-9*dir, -13);
+  }
+  ctx.stroke();
+
+  // cabeza con mascara
+  ctx.fillStyle = skin.torso;
+  ctx.beginPath(); ctx.arc(0, -17, 7, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = skin.mask;
+  ctx.beginPath();
+  ctx.ellipse(2.5*dir, -18, 3.8, 2.5, 0.25*dir, 0, Math.PI*2);
+  ctx.fill();
+  if (skin.eyeGlow){
+    ctx.fillStyle = skin.eyeColor;
+    ctx.shadowColor = skin.eyeColor;
+    ctx.shadowBlur = 5;
+    ctx.beginPath();
+    ctx.ellipse(2.5*dir, -18, 2, 1.1, 0.25*dir, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.restore();
+}
+
+function drawPowerUps(){
+  const t = Date.now() / 300;
+  for (const p of powerUps){
+    const sx = p.x - cameraX;
+    if (sx < -30 || sx > W + 30) continue;
+    const bob = Math.sin(t + p.x) * 6;
+    const sy = p.y + bob;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    const glow = ctx.createRadialGradient(0,0,2,0,0,22);
+    if (p.type === 'jump'){
+      glow.addColorStop(0, 'rgba(255,209,102,.9)');
+      glow.addColorStop(1, 'rgba(255,209,102,0)');
+    } else if (p.type === 'shoot'){
+      glow.addColorStop(0, 'rgba(120,220,255,.9)');
+      glow.addColorStop(1, 'rgba(120,220,255,0)');
+    } else {
+      glow.addColorStop(0, 'rgba(255,120,170,.9)');
+      glow.addColorStop(1, 'rgba(255,120,170,0)');
+    }
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.fill();
+
+    ctx.fillStyle = p.type === 'jump' ? '#ffd166' : (p.type === 'shoot' ? '#78dcff' : '#ff78aa');
+    ctx.beginPath(); ctx.arc(0,0,13,0,Math.PI*2); ctx.fill();
+
+    ctx.fillStyle = '#1a1224';
+    if (p.type === 'jump'){
+      // flecha hacia arriba
+      ctx.beginPath();
+      ctx.moveTo(0,-7); ctx.lineTo(6,2); ctx.lineTo(2,2); ctx.lineTo(2,8);
+      ctx.lineTo(-2,8); ctx.lineTo(-2,2); ctx.lineTo(-6,2);
+      ctx.closePath(); ctx.fill();
+    } else if (p.type === 'shoot'){
+      // telaraña de mira (cruz + círculo)
+      ctx.strokeStyle = '#1a1224';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(0, 0, 5.5, 0, Math.PI*2);
+      ctx.moveTo(0,-8); ctx.lineTo(0,8);
+      ctx.moveTo(-8,0); ctx.lineTo(8,0);
+      ctx.stroke();
+    } else {
+      // corazón
+      ctx.beginPath();
+      ctx.moveTo(0,7);
+      ctx.bezierCurveTo(-9,-1, -6,-9, 0,-3);
+      ctx.bezierCurveTo(6,-9, 9,-1, 0,7);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function drawPickupMsg(){
+  if (!pickupMsg) return;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, pickupMsg.timer / 25);
+  ctx.font = 'bold 26px Segoe UI, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.shadowColor = 'rgba(0,0,0,.6)';
+  ctx.shadowBlur = 8;
+  ctx.fillText(pickupMsg.text, W/2, H*0.22);
+  ctx.restore();
+}
+
+function drawEnemies(){
+  for (const en of enemies){
+    const sx = en.drawX !== undefined ? en.drawX - cameraX : en.x - cameraX;
+    if (sx < -60 || sx > W + 60) continue;
+    const dir = en.dir || -1; // mirando hacia atrás, de donde viene el jugador
+    ctx.save();
+    ctx.translate(sx, en.y);
+
+    // aura amenazante
+    const glow = ctx.createRadialGradient(0,0,4,0,0,36);
+    glow.addColorStop(0, 'rgba(120,255,90,.28)');
+    glow.addColorStop(1, 'rgba(120,255,90,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0,2,36,0,Math.PI*2); ctx.fill();
+
+    // tabla voladora
+    ctx.fillStyle = '#22301f';
+    ctx.beginPath();
+    ctx.ellipse(0, 17, 25, 6, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#8bff5a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, 17, 25, 6, 0, 0, Math.PI*2); ctx.stroke();
+
+    ctx.lineCap = 'round';
+
+    // piernas (verde oscuro), pose parada/flexionada sobre la tabla
+    ctx.strokeStyle = '#28471f';
+    ctx.lineWidth = 5.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 5); ctx.lineTo(-8*dir, 16);
+    ctx.moveTo(0, 5); ctx.lineTo(9*dir, 15);
+    ctx.stroke();
+
+    // torso (verde)
+    ctx.fillStyle = '#357a2c';
+    ctx.beginPath();
+    ctx.ellipse(0, -3, 9, 12, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // brazos abiertos, en pose de vuelo/equilibrio
+    ctx.strokeStyle = '#357a2c';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(0, -7); ctx.lineTo(16*dir, -12);
+    ctx.moveTo(0, -7); ctx.lineTo(-15*dir, -1);
+    ctx.stroke();
+
+    // capucha (verde muy oscuro / casi negra), cubre la cabeza dejando la cara en sombra
+    ctx.fillStyle = '#1a2b14';
+    ctx.beginPath();
+    ctx.moveTo(-10, -14);
+    ctx.quadraticCurveTo(-13, -30, 0, -30);
+    ctx.quadraticCurveTo(13, -30, 10, -14);
+    ctx.quadraticCurveTo(0, -19, -10, -14);
+    ctx.closePath();
+    ctx.fill();
+
+    // rostro en sombra bajo la capucha
+    ctx.fillStyle = '#0c1409';
+    ctx.beginPath(); ctx.ellipse(0, -19, 6.5, 6, 0, 0, Math.PI*2); ctx.fill();
+
+    // ojos brillosos amarillos
+    ctx.fillStyle = '#ffe066';
+    ctx.shadowColor = '#ffe066';
+    ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.ellipse(-2.6*dir, -19.5, 2, 1.3, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(2.6*dir, -19.5, 2, 1.3, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.restore();
+  }
+}
+
+function drawClimbers(){
+  const now = Date.now();
+  for (const c of climbers){
+    const sx = c.x - cameraX;
+    if (sx < -70 || sx > W + 70) continue;
+    ctx.save();
+    ctx.translate(sx, c.y);
+    ctx.scale(1.4, 1.4); // más grande, para que se note contra la fachada
+
+    // halo rojo de fondo, para que resalte contra edificios oscuros
+    const glow = ctx.createRadialGradient(0,0,4,0,0,34);
+    glow.addColorStop(0, 'rgba(255,60,60,.35)');
+    glow.addColorStop(1, 'rgba(255,60,60,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0,0,34,0,Math.PI*2); ctx.fill();
+
+    ctx.strokeStyle = '#8b929c'; // más claro que el cuerpo, para contraste
+    ctx.lineWidth = 4.5;
+    ctx.lineCap = 'round';
+
+    // 4 brazos mecánicos saliendo de los hombros (2 arriba, 2 abajo por costado),
+    // no repartidos en todas direcciones — así se lee como una persona, no una araña
+    function drawArm(shoulderX, shoulderY, dir, seed){
+      const wob = Math.sin(now/240 + seed) * 6;
+      const elbowX = shoulderX + dir*17, elbowY = shoulderY + wob*0.4;
+      const handX = elbowX + dir*13, handY = elbowY + 9 + wob*0.4;
+      ctx.beginPath();
+      ctx.moveTo(shoulderX, shoulderY);
+      ctx.lineTo(elbowX, elbowY);
+      ctx.lineTo(handX, handY);
+      ctx.stroke();
+    }
+    drawArm(-8, -9, -1, 0);
+    drawArm(-8, 5, -1, 1.6);
+    drawArm(8, -9, 1, 3.1);
+    drawArm(8, 5, 1, 4.7);
+
+    // piernas cortas, agarradas a la pared
+    ctx.strokeStyle = '#3a3f47';
+    ctx.lineWidth = 4.5;
+    ctx.beginPath();
+    ctx.moveTo(-4, 11); ctx.lineTo(-8, 20);
+    ctx.moveTo(4, 11); ctx.lineTo(8, 20);
+    ctx.stroke();
+
+    // torso vertical (forma de persona, no un blob redondo)
+    ctx.fillStyle = '#3a3f47';
+    ctx.beginPath(); ctx.ellipse(0, 0, 9, 13, 0, 0, Math.PI*2); ctx.fill();
+
+    // cabeza
+    ctx.beginPath(); ctx.arc(0, -17, 7.5, 0, Math.PI*2); ctx.fill();
+
+    // lente/ojo rojo brillante, único y centrado (referencia mecánica, no rostro humano)
+    ctx.fillStyle = '#ff3b3b';
+    ctx.shadowColor = '#ff3b3b'; ctx.shadowBlur = 9;
+    ctx.beginPath(); ctx.ellipse(0, -17, 4, 2.6, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.restore();
+  }
+}
+
+function drawSandHands(){
+  for (const s of sandHands){
+    const hf = s.heightFactor || 0;
+    if (hf < 0.03) continue; // escondida, no hace falta dibujarla
+    const sx = s.x - cameraX;
+    if (sx < -140 || sx > W + 140) continue;
+    const handH = (groundY - s.topY) + 30;
+
+    ctx.save();
+    ctx.translate(sx, groundY);
+
+    // polvo en la base
+    ctx.fillStyle = `rgba(194,161,110,${0.2 + hf*0.25})`;
+    ctx.beginPath(); ctx.ellipse(0, 2, 46, 13, 0, 0, Math.PI*2); ctx.fill();
+
+    // antebrazo
+    const grad = ctx.createLinearGradient(0, 0, 0, -handH);
+    grad.addColorStop(0, '#8a6a42');
+    grad.addColorStop(1, '#c9a56b');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(-17, 4); ctx.lineTo(-13, -handH+28); ctx.lineTo(13, -handH+28); ctx.lineTo(17, 4);
+    ctx.closePath(); ctx.fill();
+
+    // mano y dedos
+    ctx.translate(0, -handH + 28);
+    ctx.fillStyle = '#c9a56b';
+    ctx.beginPath(); ctx.ellipse(0, 4, 22, 15, 0, 0, Math.PI*2); ctx.fill();
+    [-19, -8, 4, 15].forEach((fx, i) => {
+      const flen = 24 + (i === 1 || i === 2 ? 6 : 0);
+      ctx.beginPath();
+      ctx.ellipse(fx, -flen/2 + 2, 6.5, flen/2, 0, 0, Math.PI*2);
+      ctx.fill();
+    });
+
+    ctx.restore();
+  }
+}
+
+function drawRhinos(){
+  const now = Date.now();
+  for (const r of rhinos){
+    const sx = r.x - cameraX;
+    if (sx < -60 || sx > W + 60) continue;
+    ctx.save();
+    ctx.translate(sx, groundY);
+
+    // polvo levantado al correr
+    ctx.fillStyle = 'rgba(160,150,140,.3)';
+    ctx.beginPath(); ctx.ellipse(-22, -4, 20, 7, 0, 0, Math.PI*2); ctx.fill();
+
+    // patas (animación simple de carrera)
+    const legPhase = Math.sin(now/70 + r.x*0.05);
+    ctx.strokeStyle = '#3a4148';
+    ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-14, -6); ctx.lineTo(-14 + legPhase*8, 4);
+    ctx.moveTo(10, -6); ctx.lineTo(10 - legPhase*8, 4);
+    ctx.stroke();
+
+    // cuerpo macizo
+    ctx.fillStyle = '#5b6570';
+    ctx.beginPath();
+    ctx.ellipse(-2, -20, 30, 18, 0, 0, Math.PI*2);
+    ctx.fill();
+    // placas del lomo
+    ctx.fillStyle = '#454e57';
+    ctx.beginPath(); ctx.ellipse(-2, -30, 24, 8, 0, 0, Math.PI*2); ctx.fill();
+
+    // cabeza y cuerno
+    ctx.fillStyle = '#5b6570';
+    ctx.beginPath(); ctx.ellipse(24, -18, 13, 11, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#d8d0c0';
+    ctx.beginPath();
+    ctx.moveTo(33, -22); ctx.lineTo(48, -30); ctx.lineTo(34, -14);
+    ctx.closePath(); ctx.fill();
+
+    // ojo
+    ctx.fillStyle = '#ff5a3c';
+    ctx.beginPath(); ctx.ellipse(28, -20, 2, 1.6, 0, 0, Math.PI*2); ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+function drawScorpions(){
+  const now = Date.now();
+  for (const s of scorpions){
+    const sx = s.x - cameraX;
+    if (sx < -60 || sx > W + 60) continue;
+    const chargeUp = Math.max(0, 1 - s.cooldown / 30); // brilla más cerca de disparar
+    ctx.save();
+    ctx.translate(sx, s.y);
+
+    // cuerpo agazapado
+    ctx.fillStyle = '#1c3324';
+    ctx.beginPath(); ctx.ellipse(0, 0, 11, 8, 0, 0, Math.PI*2); ctx.fill();
+
+    // cola curva sobre el hombro, con aguijón que brilla al cargar
+    ctx.strokeStyle = '#274a34';
+    ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-3, -4);
+    ctx.quadraticCurveTo(-18, -10, -14, -24);
+    ctx.quadraticCurveTo(-10, -32, 0, -30);
+    ctx.stroke();
+    ctx.fillStyle = chargeUp > 0.5 ? '#8aff6a' : '#3c6b48';
+    if (chargeUp > 0.5){ ctx.shadowColor = '#8aff6a'; ctx.shadowBlur = 8; }
+    ctx.beginPath(); ctx.ellipse(0, -30, 4, 3, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // ojos
+    ctx.fillStyle = '#ffe066';
+    ctx.beginPath(); ctx.ellipse(-3, -2, 1.6, 1.2, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(3, -2, 1.6, 1.2, 0, 0, Math.PI*2); ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+function drawPoisonBolts(){
+  for (const p of poisonBolts){
+    const sx = p.x - cameraX, sy = p.y;
+    if (sx < -20 || sx > W + 20) continue;
+    ctx.save();
+    ctx.translate(sx, sy);
+    const glow = ctx.createRadialGradient(0,0,1,0,0,10);
+    glow.addColorStop(0, 'rgba(138,255,106,.9)');
+    glow.addColorStop(1, 'rgba(138,255,106,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#8aff6a';
+    ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawWebShots(){
+  for (const w of webShots){
+    const sx = w.x - cameraX, sy = w.y;
+    if (sx < -20 || sx > W + 20) continue;
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(Math.atan2(w.vy, w.vx));
+    const glow = ctx.createRadialGradient(0,0,1,0,0,9);
+    glow.addColorStop(0, 'rgba(255,255,255,.9)');
+    glow.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0,0,9,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#eaeaea';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-6,0); ctx.lineTo(6,0); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(4,0,2.2,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawCranes(){
+  for (const c of cranes){
+    const sx = c.baseX - cameraX;
+    if (sx + c.jibLength < -60 || sx > W + 60) continue;
+    ctx.save();
+
+    // torre vertical y base
+    ctx.strokeStyle = '#5a5f66';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(sx, groundY);
+    ctx.lineTo(sx, c.y);
+    ctx.stroke();
+    ctx.fillStyle = '#3d4147';
+    ctx.fillRect(sx - 14, groundY - 6, 28, 10);
+
+    // pluma horizontal con tirante triangular
+    ctx.strokeStyle = '#5a5f66';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(sx, c.y);
+    ctx.lineTo(sx + c.jibLength, c.y);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sx, c.y);
+    ctx.lineTo(sx + c.jibLength*0.5, c.y - 18);
+    ctx.lineTo(sx + c.jibLength, c.y);
+    ctx.stroke();
+
+    // cable y gancho en su posición actual (con aro brillante: se nota que es agarrable)
+    const hookSx = c.hookX - cameraX;
+    ctx.strokeStyle = 'rgba(255,255,255,.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(hookSx, c.y);
+    ctx.lineTo(hookSx, c.hookY);
+    ctx.stroke();
+
+    const glow = ctx.createRadialGradient(hookSx, c.hookY, 2, hookSx, c.hookY, 20);
+    glow.addColorStop(0, 'rgba(255,209,102,.55)');
+    glow.addColorStop(1, 'rgba(255,209,102,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(hookSx, c.hookY, 20, 0, Math.PI*2); ctx.fill();
+
+    ctx.strokeStyle = '#ffd166';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(hookSx, c.hookY + 6, 8, Math.PI*0.15, Math.PI*0.95, false);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+function drawHelicopters(){
+  const now = Date.now();
+  for (const h of helicopters){
+    const sx = h.x - cameraX;
+    if (sx < -80 || sx > W + 80) continue;
+    ctx.save();
+    ctx.translate(sx, h.y);
+
+    // rotor girando
+    const rotorAngle = (now/40) % Math.PI;
+    ctx.strokeStyle = 'rgba(255,255,255,.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-30*Math.cos(rotorAngle), -14 - 30*Math.sin(rotorAngle)*0.25);
+    ctx.lineTo(30*Math.cos(rotorAngle), -14 + 30*Math.sin(rotorAngle)*0.25);
+    ctx.stroke();
+
+    const bodyColor = h.state === 'riding' ? '#e0262c' : '#2b3a4a';
+
+    // cola
+    ctx.fillStyle = bodyColor;
+    ctx.beginPath();
+    ctx.moveTo(-20, -4); ctx.lineTo(-38, -10); ctx.lineTo(-34, -2);
+    ctx.closePath(); ctx.fill();
+
+    // cuerpo
+    ctx.beginPath();
+    ctx.ellipse(0, -2, 22, 10, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // cabina
+    ctx.fillStyle = 'rgba(180,220,255,.6)';
+    ctx.beginPath();
+    ctx.ellipse(10, -4, 8, 6, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // patines
+    ctx.strokeStyle = '#1a1f26';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(-14, 8); ctx.lineTo(14, 8);
+    ctx.moveTo(-10, 4); ctx.lineTo(-10, 8);
+    ctx.moveTo(10, 4); ctx.lineTo(10, 8);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+function draw(){
+  drawSky();
+  drawBuildings();
+  drawGround();
+  drawSandHands();
+  drawCranes();
+  drawRhinos();
+  drawPowerUps();
+  drawEnemies();
+  drawClimbers();
+  drawScorpions();
+  drawHelicopters();
+  drawPoisonBolts();
+  drawWebShots();
+  drawWeb();
+  drawMissMarker();
+  drawPlayer();
+  drawPickupMsg();
+}
+
+function loop(){
+  if (!paused) update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+initGame();
+</script>
+</body>
+</html>
