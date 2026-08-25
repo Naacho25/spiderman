@@ -112,36 +112,6 @@
     padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
     cursor: pointer; margin-top: 10px;
   }
-  #coopBtn {
-    background: transparent; color: #8aff6a; border: 2px solid #8aff6a;
-    padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
-    cursor: pointer; margin-top: 10px;
-  }
-  #coopOverlay {
-    position: fixed; inset: 0; background: rgba(6,4,14,.97); z-index: 6;
-    display: none; flex-direction: column; align-items: center;
-    padding: 36px 20px 24px; overflow-y: auto; color: #fff; text-align: center;
-    touch-action: pan-y; -webkit-overflow-scrolling: touch;
-  }
-  #coopOverlay.show { display: flex; }
-  #coopOverlay h2 { font-size: 26px; margin: 0 0 4px; }
-  #coopChoice { display: flex; gap: 12px; margin-top: 18px; flex-wrap: wrap; justify-content: center; }
-  #coopChoice button, #coopJoinConfirmBtn {
-    background: #8aff6a; color: #08260a; border: none; padding: 11px 22px;
-    border-radius: 24px; font-weight: 800; cursor: pointer; font-size: 14px;
-  }
-  #coopJoinForm { display: flex; gap: 10px; margin-top: 18px; align-items: center; }
-  #coopCodeInput {
-    background: rgba(255,255,255,.1); border: 2px solid #8aff6a; color: #fff;
-    padding: 10px 14px; border-radius: 14px; font-size: 18px; letter-spacing: 3px;
-    text-align: center; width: 130px; text-transform: uppercase;
-  }
-  #coopStatus { margin-top: 20px; font-size: 14px; color: #ccc; min-height: 20px; max-width: 360px; }
-  #closeCoop {
-    position: sticky; bottom: 6px; margin-top: 20px; background: rgba(255,255,255,.12); color: #fff;
-    border: none; padding: 11px 30px; border-radius: 24px; font-weight: 800; cursor: pointer;
-    box-shadow: 0 4px 14px rgba(0,0,0,.5); flex-shrink: 0;
-  }
   #instructionsOverlay {
     position: fixed; inset: 0; background: rgba(6,4,14,.97); z-index: 6;
     display: none; flex-direction: column; align-items: center;
@@ -200,7 +170,7 @@
 
 <canvas id="game"></canvas>
 
-<div id="hud">🏙 <span id="score">0</span> m &nbsp; | &nbsp; 🏆 <span id="best">0</span> m &nbsp; <span id="lifeIndicator" style="display:none">💫</span></div>
+<div id="hud">🏙 <span id="score">0</span> m &nbsp; | &nbsp; 🏆 <span id="best">0</span> m &nbsp; <span id="lifeIndicator" style="display:none">💫</span> <span id="flowIndicator" style="display:none"></span></div>
 <div id="hint">Tocá para engancharte · Arrastrá arriba/abajo (o la ruedita) para alargar/achicar la telaraña · Movete a los costados para impulso · 🚀 salto, 🕸️ disparo, 💫 rebote extra</div>
 <button id="pauseBtn">⏸</button>
 <div id="achievementToast"></div>
@@ -227,155 +197,7 @@
   <button id="startBtn">Jugar</button>
   <button id="achievementsBtn">🏆 Logros</button>
   <button id="instructionsBtn">📖 Instrucciones</button>
-  <button id="coopBtn">👥 2 Jugadores (beta)</button>
 </div>
-
-<div id="coopOverlay">
-  <h2>👥 Cooperativo</h2>
-  <div class="ach-sub">Fase 1: conexión entre dispositivos. La partida en sí todavía no arranca acá.</div>
-
-  <div id="coopChoice">
-    <button id="coopCreateBtn">Crear sala</button>
-    <button id="coopJoinBtn">Unirse con código</button>
-  </div>
-
-  <div id="coopJoinForm" style="display:none">
-    <input id="coopCodeInput" maxlength="5" placeholder="CÓDIGO" autocapitalize="characters">
-    <button id="coopJoinConfirmBtn">Conectar</button>
-  </div>
-
-  <div id="coopStatus"></div>
-
-  <button id="closeCoop">Volver</button>
-</div>
-
-<script type="module">
-  const APP_ID = 'trepamuros-coop-v1';
-  let joinRoomFn = null;
-  let room = null;
-  let sendHello, getHello;
-  let isHost = false;
-  let peerConnected = false;
-
-  function setStatus(text){
-    document.getElementById('coopStatus').textContent = text;
-  }
-
-  // carga Trystero recién cuando hace falta (no al abrir la página), y si falla
-  // por lo que sea (sin internet, CDN caído, etc.) avisa en vez de quedarse mudo
-  async function ensureTrystero(){
-    if (joinRoomFn) return joinRoomFn;
-    setStatus('Cargando módulo de conexión…');
-    try {
-      const mod = await import('https://esm.run/@trystero-p2p/mqtt');
-      console.log('Trystero cargado, exports disponibles:', Object.keys(mod));
-      if (typeof mod.joinRoom !== 'function'){
-        setStatus('⚠️ El módulo cargó pero no tiene joinRoom. Exports: ' + Object.keys(mod).join(', '));
-        return null;
-      }
-      joinRoomFn = mod.joinRoom;
-      return joinRoomFn;
-    } catch (err){
-      console.error('No se pudo cargar Trystero', err);
-      setStatus('⚠️ No se pudo cargar el módulo: ' + (err && err.message ? err.message : err));
-      return null;
-    }
-  }
-
-  async function connectToRoom(code, hosting){
-    const joinRoom = await ensureTrystero();
-    if (!joinRoom) return; // ensureTrystero ya mostró el error
-    isHost = hosting;
-    try {
-      room = joinRoom({ appId: APP_ID }, 'trepamuros-' + code);
-    } catch (err){
-      console.error('No se pudo crear/unir a la sala', err);
-      setStatus('⚠️ Error al conectar: ' + (err && err.message ? err.message : err));
-      return;
-    }
-    const actions = room.makeAction('hello');
-    sendHello = actions[0];
-    getHello = actions[1];
-
-    const fullRoomId = 'trepamuros-' + code;
-    console.log('Sala exacta usada:', APP_ID, fullRoomId, 'rol:', hosting ? 'host' : 'guest');
-
-    setStatus(hosting
-      ? 'Sala creada. Código: ' + code + ' — esperando al otro jugador…'
-      : 'Conectando con la sala ' + code + '…');
-
-    // chequeo periódico visible, para saber si realmente no hay ningún peer detectado
-    const pollInterval = setInterval(() => {
-      if (peerConnected){ clearInterval(pollInterval); return; }
-      try {
-        const peers = room.getPeers ? Object.keys(room.getPeers()) : null;
-        console.log('Chequeo de sala', fullRoomId, '— peers detectados:', peers);
-      } catch (e){ console.log('No se pudo listar peers:', e); }
-    }, 4000);
-
-    setTimeout(() => {
-      if (!peerConnected){
-        setStatus((hosting
-          ? 'Sigue esperando al otro jugador (código: ' + code + '). '
-          : 'Todavía no logra conectar con la sala ' + code + '. ') +
-          'Revisá que el código sea EXACTAMENTE igual de los dos lados (fijate en la consola del navegador: sala ' + fullRoomId + ').');
-      }
-    }, 18000);
-
-    room.onPeerJoin(peerId => {
-      peerConnected = true;
-      clearInterval(pollInterval);
-      setStatus('✅ ¡Conectado! (fase 1 completa — la partida cooperativa se suma en el próximo paso)');
-      sendHello({ msg: 'hola, soy ' + (hosting ? 'el anfitrión' : 'el invitado') });
-    });
-
-    room.onPeerLeave(peerId => {
-      peerConnected = false;
-      setStatus('El otro jugador se desconectó.');
-    });
-
-    getHello(data => {
-      console.log('Mensaje del otro dispositivo:', data.msg);
-    });
-  }
-
-  // se exponen para que el script principal del juego (que sí anda garantizado) las use
-  window.coopConnect = connectToRoom;
-</script>
-
-<script>
-  // estos listeners son del script clásico del juego: no dependen de que Trystero
-  // haya cargado bien, así que el botón y el panel SIEMPRE responden al toque/click
-  function coopRandomCode(){
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random()*chars.length)];
-    return code;
-  }
-  document.getElementById('coopBtn').addEventListener('click', () => {
-    document.getElementById('coopOverlay').classList.add('show');
-  });
-  document.getElementById('closeCoop').addEventListener('click', () => {
-    document.getElementById('coopOverlay').classList.remove('show');
-  });
-  document.getElementById('coopCreateBtn').addEventListener('click', () => {
-    const code = coopRandomCode();
-    document.getElementById('coopChoice').style.display = 'none';
-    document.getElementById('coopStatus').textContent = 'Preparando conexión…';
-    if (window.coopConnect) window.coopConnect(code, true);
-  });
-  document.getElementById('coopJoinBtn').addEventListener('click', () => {
-    document.getElementById('coopChoice').style.display = 'none';
-    document.getElementById('coopJoinForm').style.display = 'flex';
-  });
-  document.getElementById('coopJoinConfirmBtn').addEventListener('click', () => {
-    const code = document.getElementById('coopCodeInput').value.trim().toUpperCase();
-    if (code.length < 4) { document.getElementById('coopStatus').textContent = 'Escribí el código completo.'; return; }
-    document.getElementById('coopJoinForm').style.display = 'none';
-    document.getElementById('coopStatus').textContent = 'Preparando conexión…';
-    if (window.coopConnect) window.coopConnect(code, false);
-  });
-</script>
 
 <div id="achievementsOverlay">
   <h2>🏆 Logros</h2>
@@ -402,6 +224,10 @@
     <div class="instr-row">
       <span class="instr-icon">↕️</span>
       <div><div class="instr-name">Largo de la telaraña</div><div class="instr-desc">Colgado, arrastrá el dedo hacia arriba para alargar la telaraña o hacia abajo para acortarla. En PC, usá la ruedita del mouse (arriba alarga, abajo achica).</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🔥</span>
+      <div><div class="instr-name">Racha de vuelo</div><div class="instr-desc">Si soltás la telaraña rápido después de engancharte (en vez de quedarte todo el balanceo colgado) y avanzaste bastante, sumás racha y te da un empujón extra hacia arriba. Encadenar sueltas rápidas te va llevando cada vez más alto, lejos de la calle. Un balanceo largo corta la racha.</div></div>
     </div>
     <div class="instr-row">
       <span class="instr-icon">🏙️</span>
@@ -485,12 +311,19 @@ addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('selectstart', e => e.preventDefault());
 
 // ---------- estado global ----------
-const GRAVITY = 0.42;
+const GRAVITY = 0.36;
 const DAMPING = 0.997;
 const AIR_CONTROL = 0.34;
 const MAX_WEB = 520;
 const JUMP_VY = -12;
 const AUTO_SHOOT_DURATION = 300; // ~5s a 60fps
+// racha de vuelo: premia soltar la telaraña rápido en vez de quedarte todo el
+// péndulo colgado — encadenar sueltas rápidas te va empujando cada vez más alto
+const FAST_SWING_FRAMES = 20;   // soltar antes de esto cuenta como "rápido"
+const MIN_FLOW_DISTANCE = 35;   // tenés que haber avanzado esto como mínimo
+const FLOW_BOOST_PER_COMBO = 3.4;
+const BASE_RELEASE_LIFT = 2.2; // empuje parejo en cada suelta, tengas racha o no
+const MAX_FLOW_COMBO = 6;
 const AUTO_SHOOT_COOLDOWN = 24;  // frames entre disparo y disparo
 
 let groundY, cameraX, buildings, powerUps, enemies, climbers, sandHands, rhinos, scorpions, poisonBolts, cranes, helicopters, webShots, player, web, keys, score, best = 0, running = false, gameOver = false;
@@ -733,7 +566,7 @@ function initGame(){
   while (lastEnd < W*2){
     const gap = 60 + Math.random()*100;
     const width = 110 + Math.random()*170;
-    const height = H*(0.26 + Math.random()*0.44);
+    const height = H*(0.36 + Math.random()*0.42);
     const x = lastEnd + gap;
     const b = makeBuilding(x, width, height);
     buildings.push(b);
@@ -745,10 +578,12 @@ function initGame(){
   canLand = true;
   player = {
     x: first.x + first.width/2, y: groundY - first.height - 14,
-    px: 0, py: 0, radius: 14, grounded: true, facing: 1, autoShoot: false, autoShootTimer: 0, shootCooldown: 0, extraLives: 0, riding: null
+    px: 0, py: 0, radius: 14, grounded: true, facing: 1, autoShoot: false, autoShootTimer: 0, shootCooldown: 0, extraLives: 0, riding: null, flowCombo: 0, attachFrame: 0, attachX: 0
   };
   player.px = player.x; player.py = player.y;
   updateLifeHud();
+  const flowEl0 = document.getElementById('flowIndicator');
+  if (flowEl0) flowEl0.style.display = 'none';
 
   gameOver = false;
   document.getElementById('overlay').classList.remove('show');
@@ -759,7 +594,7 @@ function ensureBuildings(){
   while (last.x + last.width < cameraX + W + 500){
     const gap = 60 + Math.random()*110;
     const width = 110 + Math.random()*180;
-    const height = H*(0.24 + Math.random()*0.44);
+    const height = H*(0.34 + Math.random()*0.42);
     const x = last.x + last.width + gap;
     const b = makeBuilding(x, width, height);
     buildings.push(b);
@@ -1082,6 +917,8 @@ function tryShootWeb(clientX, clientY){
     web.len = dist;
     web.baseLen = dist;
     player.grounded = false;
+    player.attachFrame = elapsedFrames;
+    player.attachX = player.x;
   } else {
     // tiro fallido: no hay nada ahí (o estás arriba del techo) — se ve la X y la
     // telaraña sale disparada hacia ese punto pero no engancha en ningún lado
@@ -1089,7 +926,36 @@ function tryShootWeb(clientX, clientY){
     webThrow = { fromX: player.x, fromY: player.y, toX: p.x, toY: p.y, timer: 9 };
   }
 }
-function releaseWeb(){ web.active = false; }
+function releaseWeb(){
+  if (web.active){
+    // empuje parejo en cada suelta: ayuda a ganar altura en general, no solo con racha
+    player.py += BASE_RELEASE_LIFT;
+
+    // racha de vuelo: soltar rápido y habiendo avanzado bastante suma combo y un
+    // empujón extra hacia arriba; quedarte todo el péndulo colgado corta la racha
+    const duration = elapsedFrames - player.attachFrame;
+    const traveled = player.x - player.attachX;
+    if (duration > 3 && duration < FAST_SWING_FRAMES && traveled > MIN_FLOW_DISTANCE){
+      player.flowCombo = Math.min(player.flowCombo + 1, MAX_FLOW_COMBO);
+    } else if (duration >= FAST_SWING_FRAMES){
+      player.flowCombo = 0;
+    }
+    if (player.flowCombo > 0){
+      player.py += FLOW_BOOST_PER_COMBO * player.flowCombo;
+      if (player.flowCombo >= 2) pickupMsg = { text: '🔥 Racha x' + player.flowCombo, timer: 35 };
+    }
+  }
+  const flowEl = document.getElementById('flowIndicator');
+  if (flowEl){
+    if (player.flowCombo >= 2){
+      flowEl.style.display = 'inline';
+      flowEl.textContent = '🔥 x' + player.flowCombo;
+    } else {
+      flowEl.style.display = 'none';
+    }
+  }
+  web.active = false;
+}
 
 let pointerDown = false;
 canvas.addEventListener('pointerdown', e => {
