@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -sf \"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/shaders/OutputShader.js\" -o \"vendor/three/examples/jsm/shaders/OutputShader.js\")",
+      "PowerShell(node --version)",
+      "Bash(cp \"index.html\" \"index-2d-legacy-backup.html\" *)",
+      "Bash(py --version)",
+      "Bash(node --check src/enemies3d.js)",
+      "Bash(node --check src/hero.js)",
+      "PowerShell(node --check \"src/hero.js\")"
+    ]
+  }
+}

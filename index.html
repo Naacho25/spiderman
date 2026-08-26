@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Trepamuros - Swing entre edificios</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #0a0612; font-family: 'Segoe UI', Arial, sans-serif;
+    height: 100%; width: 100%;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  canvas { display: block; touch-action: none; cursor: crosshair; }
+
+  #hud {
+    position: fixed; top: 14px; left: 18px; color: #fff;
+    font-size: 22px; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.6);
+    letter-spacing: .5px; user-select: none; pointer-events: none; display: none;
+  }
+  #hud span { color: #ffd166; }
+
+  #hint {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,.75); font-size: 14px; text-align: center;
+    user-select: none; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,.7); display: none;
+  }
+
+  #pickupMsg {
+    position: fixed; top: 20%; left: 50%; transform: translateX(-50%);
+    color: #fff; font-size: 22px; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,.7);
+    user-select: none; pointer-events: none; display: none; z-index: 3; text-align: center;
+  }
+
+  #overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; background: rgba(6,4,14,.72); backdrop-filter: blur(2px);
+    color: #fff; text-align: center; opacity: 0; pointer-events: none; transition: opacity .25s;
+  }
+  #overlay.show { opacity: 1; pointer-events: all; }
+  #overlay h1 { font-size: 40px; margin: 0 0 6px; letter-spacing: 1px; }
+  #overlay p { font-size: 17px; margin: 4px 0 20px; color: #ccc; }
+  #overlay p span { color: #ffd166; font-weight: 700; }
+  .record-line { font-size: 14px !important; margin: -12px 0 20px !important; color: #4dd0e1 !important; }
+  #restartBtn {
+    background: #ff5d5d; color: #fff; border: none; padding: 12px 30px;
+    font-size: 17px; font-weight: 700; border-radius: 30px; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(255,93,93,.4); transition: transform .1s;
+  }
+  #restartBtn:active { transform: scale(0.95); }
+  #menuFromDeathBtn {
+    display: block; margin: 10px auto 0; background: transparent; color: #ccc;
+    border: 2px solid rgba(255,255,255,.35); padding: 9px 24px; font-size: 14px;
+    font-weight: 700; border-radius: 26px; cursor: pointer;
+  }
+
+  #startOverlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; background: rgba(6,4,14,.85);
+    color: #fff; text-align: center; z-index: 5;
+  }
+  #startOverlay h1 { font-size: 34px; margin-bottom: 4px; }
+  #startOverlay p { color: #bbb; max-width: 380px; line-height: 1.5; font-size: 15px; }
+  #startBtn {
+    background: #4dd0e1; color: #08202a; border: none; padding: 13px 34px;
+    font-size: 17px; font-weight: 800; border-radius: 30px; cursor: pointer; margin-top: 18px;
+  }
+  #skinPicker {
+    display: flex; gap: 16px; margin-top: 20px; flex-wrap: wrap;
+    justify-content: center; max-width: 380px;
+  }
+  .skin-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .skin-swatch {
+    width: 48px; height: 48px; border-radius: 50%; cursor: pointer;
+    border: 3px solid transparent; box-shadow: 0 3px 10px rgba(0,0,0,.5);
+    transition: transform .12s, border-color .15s;
+  }
+  .skin-swatch:hover { transform: scale(1.06); }
+  .skin-swatch.selected { border-color: #fff; transform: scale(1.1); }
+  .skin-label { font-size: 11px; color: #bbb; }
+  .skin-label.selected { color: #fff; font-weight: 700; }
+
+  #achievementsBtn {
+    background: transparent; color: #ffd166; border: 2px solid #ffd166;
+    padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
+    cursor: pointer; margin-top: 14px;
+  }
+  #achievementsOverlay {
+    position: fixed; inset: 0; background: rgba(6,4,14,.97); z-index: 6;
+    display: none; flex-direction: column; align-items: center;
+    padding: 36px 20px 24px; overflow-y: auto; color: #fff; text-align: center;
+    touch-action: pan-y; -webkit-overflow-scrolling: touch;
+  }
+  #achievementsOverlay.show { display: flex; }
+  #achievementsOverlay h2 { font-size: 26px; margin: 0 0 4px; }
+  #achievementsOverlay .ach-sub { color: #999; font-size: 13px; margin-bottom: 18px; }
+  #achievementsList { max-width: 440px; width: 100%; }
+  .ach-group { margin-bottom: 16px; text-align: left; }
+  .ach-group h3 { font-size: 14px; color: #ffd166; margin: 0 0 8px; }
+  .ach-row {
+    display: flex; gap: 12px; align-items: center; padding: 8px 10px;
+    border-radius: 10px; background: rgba(255,255,255,.04); margin-bottom: 6px; opacity: .5;
+  }
+  .ach-row.unlocked { opacity: 1; background: rgba(255,209,102,.14); }
+  .ach-icon { font-size: 20px; flex-shrink: 0; }
+  .ach-name { font-size: 14px; font-weight: 700; }
+  .ach-desc { font-size: 12px; color: #aaa; }
+  #closeAchievements {
+    position: sticky; bottom: 6px; margin-top: 14px; background: #ffd166; color: #3a2400;
+    border: none; padding: 11px 30px; border-radius: 24px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5); flex-shrink: 0;
+  }
+
+  #instructionsBtn {
+    background: transparent; color: #4dd0e1; border: 2px solid #4dd0e1;
+    padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
+    cursor: pointer; margin-top: 10px;
+  }
+  #instructionsOverlay {
+    position: fixed; inset: 0; background: rgba(6,4,14,.97); z-index: 6;
+    display: none; flex-direction: column; align-items: center;
+    padding: 36px 20px 24px; overflow-y: auto; color: #fff; text-align: center;
+    touch-action: pan-y; -webkit-overflow-scrolling: touch;
+  }
+  #instructionsOverlay.show { display: flex; }
+  #instructionsOverlay h2 { font-size: 26px; margin: 0 0 18px; }
+  #instructionsList { max-width: 460px; width: 100%; text-align: left; }
+  .instr-row {
+    display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px;
+    border-radius: 10px; background: rgba(255,255,255,.05); margin-bottom: 8px;
+  }
+  .instr-icon { font-size: 20px; flex-shrink: 0; }
+  .instr-name { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .instr-desc { font-size: 12.5px; color: #bbb; line-height: 1.4; }
+  #closeInstructions {
+    position: sticky; bottom: 6px; margin-top: 14px; background: #4dd0e1; color: #08202a;
+    border: none; padding: 11px 30px; border-radius: 24px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5); flex-shrink: 0;
+  }
+
+  #pauseBtn {
+    position: fixed; top: 14px; right: 18px; width: 42px; height: 42px;
+    border-radius: 50%; background: rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.5);
+    color: #fff; font-size: 18px; display: none; align-items: center; justify-content: center;
+    cursor: pointer; z-index: 4;
+  }
+  #achievementToast {
+    position: fixed; top: 66px; left: 50%; z-index: 8;
+    transform: translateX(-50%) translateY(-14px);
+    background: linear-gradient(135deg, #ffd166, #ffb347); color: #3a2400;
+    padding: 10px 20px; border-radius: 16px; font-size: 14px; font-weight: 800;
+    box-shadow: 0 8px 20px rgba(0,0,0,.4); opacity: 0; pointer-events: none;
+    transition: opacity .3s, transform .3s; display: flex; align-items: center; gap: 8px;
+    white-space: nowrap;
+  }
+  #achievementToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #pauseOverlay {
+    position: fixed; inset: 0; background: rgba(6,4,14,.85); z-index: 7;
+    display: none; align-items: center; justify-content: center; flex-direction: column;
+    color: #fff; text-align: center;
+  }
+  #pauseOverlay.show { display: flex; }
+  #pauseOverlay h2 { font-size: 30px; margin: 0 0 22px; }
+  #pauseOverlay button {
+    display: block; width: 220px; margin: 7px 0; padding: 12px 0;
+    border-radius: 26px; border: none; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  #resumeBtn { background: #4dd0e1; color: #08202a; }
+  #restartFromPauseBtn { background: rgba(255,255,255,.12); color: #fff; }
+  #menuBtn { background: rgba(255,255,255,.12); color: #fff; }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="hud">🏙 <span id="score">0</span> m &nbsp; | &nbsp; 🏆 <span id="best">0</span> m &nbsp; <span id="lifeIndicator" style="display:none">💫</span> <span id="flowIndicator" style="display:none"></span></div>
+<div id="hint">Tocá para engancharte · Arrastrá arriba/abajo (o la ruedita) para alargar/achicar la telaraña · Movete a los costados para impulso · 🚀 salto, 🕸️ disparo, 💫 rebote extra</div>
+<div id="pickupMsg"></div>
+<button id="pauseBtn">⏸</button>
+<div id="achievementToast"></div>
+
+<div id="pauseOverlay">
+  <h2>⏸ Pausa</h2>
+  <button id="resumeBtn">Continuar</button>
+  <button id="restartFromPauseBtn">Reiniciar</button>
+  <button id="menuBtn">Menú principal</button>
+</div>
+
+<div id="overlay">
+  <h1 id="deathTitle">💥 Tocaste el piso</h1>
+  <p>Distancia recorrida: <span id="finalScore">0</span> m</p>
+  <p id="recordLine" class="record-line"></p>
+  <button id="restartBtn">Reintentar</button>
+  <button id="menuFromDeathBtn">Menú principal</button>
+</div>
+
+<div id="startOverlay">
+  <h1>🕸️ Trepamuros</h1>
+  <p>Colgate de edificio en edificio con tu telaraña. Apuntá con el mouse (o el dedo) a una pared y mantené presionado para engancharte. Si tocás la calle, se acabó.</p>
+  <div id="skinPicker"></div>
+  <button id="startBtn">Jugar</button>
+  <button id="achievementsBtn">🏆 Logros</button>
+  <button id="instructionsBtn">📖 Instrucciones</button>
+</div>
+
+<div id="achievementsOverlay">
+  <h2>🏆 Logros</h2>
+  <div class="ach-sub">Se guardan solos entre partidas</div>
+  <div id="achievementsList"></div>
+  <button id="closeAchievements">Volver</button>
+</div>
+
+<div id="instructionsOverlay">
+  <h2>📖 Instrucciones</h2>
+  <div id="instructionsList">
+    <div class="instr-row">
+      <span class="instr-icon">🕸️</span>
+      <div><div class="instr-name">Saltar y engancharte</div><div class="instr-desc">Tocá la pantalla (o click) apuntando a un edificio para saltar del edificio inicial y engancharte con la telaraña. Es una caída libre, no un salto con impulso. La telaraña pega exacto donde tocás — si no hay pared justo ahí, o si apuntás por arriba del techo, sale una ✕ y la telaraña no engancha en ningún lado.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🤏</span>
+      <div><div class="instr-name">Soltar y volar</div><div class="instr-desc">Soltá el dedo/click para largar la telaraña y salir disparado con el impulso que traías. El timing de la soltada define qué tan lejos llegás.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">💪</span>
+      <div><div class="instr-name">Bombear el swing</div><div class="instr-desc">Mientras estás colgado con el dedo/click sostenido, movete para los costados para sumar impulso lateral y tomar más velocidad si quedaste medio trabado.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">↕️</span>
+      <div><div class="instr-name">Largo de la telaraña</div><div class="instr-desc">Colgado, arrastrá el dedo hacia arriba para alargar la telaraña o hacia abajo para acortarla. En PC, usá la ruedita del mouse (arriba alarga, abajo achica).</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🔥</span>
+      <div><div class="instr-name">Racha de vuelo</div><div class="instr-desc">Si soltás la telaraña rápido después de engancharte (en vez de quedarte todo el balanceo colgado) y avanzaste bastante, sumás racha y te da un empujón extra hacia arriba. Encadenar sueltas rápidas te va llevando cada vez más alto, lejos de la calle. Un balanceo largo corta la racha.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🏙️</span>
+      <div><div class="instr-name">Nueva York</div><div class="instr-desc">La ciudad tiene edificios comunes, pero cada tanto te vas a cruzar con algo temático — referencias al Empire State, al One World Trade Center y a Times Square, con su fachada llena de carteles de neón.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🌇</span>
+      <div><div class="instr-name">Ciclo del día</div><div class="instr-desc">Cada partida arranca de mañana y el cielo va cambiando lentamente durante todo el recorrido — mediodía, atardecer, noche con estrellas y luna, y vuelta a amanecer.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🏢</span>
+      <div><div class="instr-name">Sin apoyo</div><div class="instr-desc">Solo el primer edificio sirve de plataforma para arrancar. Después de eso, todo es en el aire — no te podés parar en ningún otro techo.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🚀</span>
+      <div><div class="instr-name">Power-up: Súper salto</div><div class="instr-desc">Te da un impulso hacia arriba y adelante para cubrir varios metros de una.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🕸️</span>
+      <div><div class="instr-name">Power-up: Disparo automático</div><div class="instr-desc">Durante unos segundos vas tirando telarañas solo, sin apuntar — cualquier enemigo cercano que toquen queda derrotado. Podés seguir colgado y moviéndote mientras dispara.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">💫</span>
+      <div><div class="instr-name">Power-up: Vida extra</div><div class="instr-desc">Se acumulan (podés tener más de una a la vez, se ven en el HUD). Si tocás el piso o chocás con el villano, gastás una y rebotás para seguir jugando en vez de perder.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">📈</span>
+      <div><div class="instr-name">Dificultad progresiva</div><div class="instr-desc">Al principio del recorrido no hay ningún enemigo. A medida que avanzás metros, van apareciendo y cada vez más seguido y más agresivos.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🦹</span>
+      <div><div class="instr-name">Villano volador</div><div class="instr-desc">Aparece flotando por el mapa a partir de los primeros metros. Esquivalo, o si tenés una vida extra vas a "derrotarlo" y seguir de largo.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🦾</span>
+      <div><div class="instr-name">Trepador mecánico</div><div class="instr-desc">Aparece más adelante en el recorrido, subiendo y bajando por los edificios con sus brazos articulados. Cuidado al pasar cerca.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🦏</span>
+      <div><div class="instr-name">Corredor callejero</div><div class="instr-desc">Corre por la calle a nivel del piso. Si volás bajito cerca de la calle, te lleva puesto — mantené altura para esquivarlo.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">✋</span>
+      <div><div class="instr-name">Mano gigante de arena</div><div class="instr-desc">A partir de tramos más avanzados, una mano enorme emerge del fondo tratando de agarrarte. Esquivala pasando lejos o por arriba.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🦂</span>
+      <div><div class="instr-name">Francotirador de techo</div><div class="instr-desc">Se queda quieto arriba de un edificio y dispara veneno con la cola hacia vos. Aparece en los tramos más avanzados y dispara cada vez más seguido.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🏗️</span>
+      <div><div class="instr-name">Grúa móvil</div><div class="instr-desc">Su gancho se desliza de un lado a otro en loop. Tenés que esperar el momento justo en que esté cerca para engancharte y seguir avanzando.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🚁</span>
+      <div><div class="instr-name">Helicóptero de ayuda</div><div class="instr-desc">Aparece muy de vez en cuando. Enganchate y te lleva rápido por unos segundos — después se eleva y te suelta para que sigas por tu cuenta.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">👕</span>
+      <div><div class="instr-name">Trajes</div><div class="instr-desc">Elegí tu skin en el menú principal antes de jugar. Hay 5 para probar.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🏆</span>
+      <div><div class="instr-name">Logros</div><div class="instr-desc">Se desbloquean por distancia, altura, power-ups agarrados, enemigos esquivados y más. Se guardan solos entre partidas.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">⏸</span>
+      <div><div class="instr-name">Pausa</div><div class="instr-desc">Botón arriba a la derecha (o tecla Escape/P) para pausar y volver al menú principal sin perder tu progreso guardado.</div></div>
+    </div>
+  </div>
+  <button id="closeInstructions">Volver</button>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/build/three.module.js"
+  }
+}
+</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
