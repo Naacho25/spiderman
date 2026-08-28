@@ -11,6 +11,7 @@
 
 import * as THREE from '../vendor/three/build/three.module.js';
 import { GLTFLoader } from '../vendor/three/examples/jsm/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from '../vendor/three/examples/jsm/utils/SkeletonUtils.js';
 import { cityGroup, scene, worldToScene, camera, FOV_Y_RAD, camDistanceForHeight, qualityTier } from './world3d.js';
 import { getSkyState } from './skystate.js';
 import * as state from './state.js';
@@ -560,7 +561,15 @@ function makeCarInstance(i){
 }
 function makePedInstance(i){
   const tpl = pedTemplates[i % pedTemplates.length];
-  const inst = tpl.clone();
+  // los personajes de "Mini Characters" vienen con esqueleto/huesos (pack
+  // pensado para animación) — un `.clone()` normal NO re-liga el esqueleto
+  // clonado a los huesos clonados (bug clásico de Three.js: el SkinnedMesh
+  // clonado sigue apuntando a los huesos del original, que nunca se agregan
+  // a la escena y por lo tanto nunca actualizan su matrixWorld) — el grupo
+  // contenedor quedaba bien posicionado, pero la malla en sí no se veía.
+  // `SkeletonUtils.clone()` es la utilidad de Three.js que sí re-liga todo
+  // correctamente. Los autos (sin huesos) no tienen este problema.
+  const inst = cloneSkinned(tpl);
   inst.scale.setScalar(PED_MODEL_SCALE);
   cityGroup.add(inst);
   return inst;

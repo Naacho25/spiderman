@@ -38,7 +38,9 @@
       "Bash(curl -sf \"https://kenney.nl/media/pages/assets/mini-characters/bfc7e272b4-1774770718/kenney_mini-characters.zip\" -o /tmp_char.zip)",
       "Bash(mkdir -p car-kit/Textures mini-characters/Textures)",
       "Bash(unzip -p /tmp_car.zip \"Models/GLB format/Textures/colormap.png\")",
-      "Bash(unzip -p /tmp_char.zip \"Models/GLB format/Textures/colormap.png\")"
+      "Bash(unzip -p /tmp_char.zip \"Models/GLB format/Textures/colormap.png\")",
+      "Bash(curl -sf \"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/utils/SkeletonUtils.js\" -o vendor/three/examples/jsm/utils/SkeletonUtils.js)",
+      "Bash(git commit -m 'Arreglar bug: los peatones no se veian \\(SkeletonUtils.clone en vez de clone plano\\) *)"
     ]
   }
 }
