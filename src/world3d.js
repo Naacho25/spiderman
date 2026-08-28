@@ -182,20 +182,77 @@ export function addCameraShake(amount, durationFrames){
   shakeDuration = durationFrames;
 }
 
-// ---------- resize ----------
+// ---------- resize (respeta `renderScale`, ver degradación dinámica abajo) ----------
+let renderScale = 1;
 export function onResize(){
   camera.aspect = W / H;
   camera.updateProjectionMatrix();
-  renderer.setSize(W, H, false);
-  composer.setSize(W, H);
-  bloomPass.resolution.set(W * TIER.bloomRes, H * TIER.bloomRes);
+  const rw = Math.max(1, Math.round(W * renderScale));
+  const rh = Math.max(1, Math.round(H * renderScale));
+  renderer.setSize(rw, rh, false);
+  // `setSize(..., false)` deja el tamaño CSS del canvas sin fijar — Three.js
+  // solo lo hace por vos cuando ese tercer argumento es `true`. Sin esto,
+  // sin ninguna regla CSS que le dé ancho/alto al <canvas>, el elemento
+  // termina mostrándose a su tamaño INTRÍNSECO, que es el del buffer interno
+  // (W*pixelRatio) — en cualquier pantalla con devicePixelRatio > 1 (muy
+  // común: casi cualquier laptop con escalado de Windows, o cualquier
+  // celular real) esto hacía que el canvas se mostrara 1.25x-3x más grande
+  // de lo que ocupa la ventana, y de paso la GPU rendereaba esa misma
+  // cantidad de más de píxeles en CADA pasada (escena + sombras + bloom)
+  // todo el tiempo, sin que sirviera para nada — probablemente la causa más
+  // grande del "anda lento" reportado en una PC de escritorio real (mi
+  // entorno de pruebas tiene devicePixelRatio=1, así que nunca lo noté).
+  // Fijar el tamaño CSS acá, siempre, en W/H lógicos (no en el buffer
+  // reducido por `renderScale`) resuelve ambos problemas de una vez.
+  renderer.domElement.style.width = W + 'px';
+  renderer.domElement.style.height = H + 'px';
+  composer.setSize(rw, rh);
+  bloomPass.resolution.set(rw * TIER.bloomRes, rh * TIER.bloomRes);
 }
 addEventListener('resize', () => setTimeout(onResize, 0));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(onResize, 0); });
 onResize();
 
+// ---------- degradación dinámica de calidad ----------
+// Los tiers estáticos (arriba) parten de heurísticas (User-Agent, cantidad de
+// núcleos) que pueden estar equivocadas para un hardware puntual (GPU
+// integrada débil, aceleración por hardware desactivada en el navegador,
+// etc. — no hay forma de detectar eso de antemano). Esto mide el tiempo real
+// de frame en vivo y, si el juego va lento de verdad, va bajando el costo de
+// render en pasos concretos — nunca vuelve a subir (evita parpadear entre
+// calidades), y nunca actúa sobre los primeros ~2s (esa ventana suele tener
+// hitches de compilación de shaders que no reflejan el rendimiento real).
+const WARMUP_FRAMES = 120;
+const BAD_FRAME_MS = 1000 / 27; // por debajo de ~27fps sostenido, degradar
+const CHECK_WINDOW = 90; // reevalúa cada ~90 frames de juego real
+let frameCount = 0, frameTimeAccum = 0, lastFrameAt = 0, downgradeStep = 0;
+const DOWNGRADE_STEPS = [
+  () => { bloomPass.enabled = false; },
+  () => { renderer.setPixelRatio(1); composer.setPixelRatio(1); },
+  () => { renderScale = 0.75; onResize(); },
+  () => { renderScale = 0.55; onResize(); },
+];
+function reportFrameTime(){
+  const now = performance.now();
+  if (lastFrameAt === 0){ lastFrameAt = now; return; }
+  const dt = now - lastFrameAt;
+  lastFrameAt = now;
+  frameCount++;
+  if (frameCount <= WARMUP_FRAMES) return;
+  frameTimeAccum += dt;
+  if (frameCount % CHECK_WINDOW === 0){
+    const avg = frameTimeAccum / CHECK_WINDOW;
+    frameTimeAccum = 0;
+    if (avg > BAD_FRAME_MS && downgradeStep < DOWNGRADE_STEPS.length){
+      DOWNGRADE_STEPS[downgradeStep]();
+      downgradeStep++;
+    }
+  }
+}
+
 // ---------- render loop hook ----------
 export function render(){
+  reportFrameTime();
   // encuadre horizontal-only, idéntico en espíritu al viejo cameraX de la
   // versión 2D: sigue al jugador, nunca cambia de pitch/roll/zoom.
   const camScene = worldToScene(cameraX + W / 2, H / 2);
