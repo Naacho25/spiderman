@@ -1,0 +1,5 @@
+# Servidor local de desarrollo (no hace falta en el repo del sitio)
+serve.ps1
+
+# Por si acaso alguna vez se agrega tooling con dependencias (no debería pasar, el proyecto no tiene build step)
+node_modules/

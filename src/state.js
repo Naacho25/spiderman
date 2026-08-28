@@ -47,7 +47,7 @@ const ROPE_ADJUST_RANGE = 55;
 
 // ---------- estado global de partida ----------
 export let groundY, cameraX, buildings, powerUps, enemies, climbers, sandHands,
-  rhinos, scorpions, poisonBolts, cranes, helicopters, webShots, player, web, keys,
+  rhinos, scorpions, poisonBolts, helicopters, webShots, player, web, keys,
   score, best = 0, running = false, gameOver = false;
 export let startBuilding, canLand, pickupMsg = null, pumpVel = 0, sessionMaxHeightPx = 0,
   paused = false, progressM = 0;
@@ -191,7 +191,6 @@ export function initGame(){
   rhinos = [];
   scorpions = [];
   poisonBolts = [];
-  cranes = [];
   helicopters = [];
   webShots = [];
   nextHeliAt = 0;
@@ -227,6 +226,7 @@ export function initGame(){
   };
   player.px = player.x; player.py = player.y;
   updateLifeHud();
+  updateAutoShootHud();
   const flowEl0 = document.getElementById('flowIndicator');
   if (flowEl0) flowEl0.style.display = 'none';
 
@@ -306,10 +306,23 @@ function updateLifeHud(){
   }
 }
 
+// power-up por tiempo (disparo automático): mostrar que está activo y cuánto
+// le queda, igual criterio que lifeIndicator/flowIndicator
+function updateAutoShootHud(){
+  const el = document.getElementById('autoShootIndicator');
+  if (!el) return;
+  if (player.autoShoot){
+    el.style.display = 'inline';
+    el.textContent = '🕸️ ' + Math.ceil(player.autoShootTimer / 60) + 's';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 // dificultad progresiva: nada al principio, después va apareciendo y cada vez más seguido
 export const DIFF = {
   goblinStart: 300, climberStart: 800, rhinoStart: 1100, sandStart: 1500,
-  scorpionStart: 1900, landmarkStart: 500, craneStart: 1200, heliStart: 700,
+  scorpionStart: 1900, landmarkStart: 500, heliStart: 700,
 };
 
 function ensureEnemies(){
@@ -371,6 +384,29 @@ function ensureClimbers(){
   climbers = climbers.filter(c => c.x > cameraX - 500);
 }
 
+// ciclo de la mano de arena: sube/baja por tiempo propio, no por cercanía del
+// jugador (antes "esperaba" a que estuvieras cerca y golpeaba sin dar chance
+// de esquivar) — ahora es predecible: descanso -> aviso ("sentido arácnido",
+// que se dibuja en enemies3d.js/vfx.js leyendo `warning`) -> sube -> golpea -> baja.
+const SAND_REST = 90, SAND_WARN = 45, SAND_RISE = 35, SAND_PEAK = 45, SAND_FALL = 35;
+const SAND_CYCLE = SAND_REST + SAND_WARN + SAND_RISE + SAND_PEAK + SAND_FALL;
+function sandCycle(elapsed, phase){
+  const t = (elapsed + phase) % SAND_CYCLE;
+  let a = t - SAND_REST;
+  if (a < 0) return { heightFactor: 0, warning: 0 };
+  if (a < SAND_WARN) return { heightFactor: 0, warning: a / SAND_WARN };
+  a -= SAND_WARN;
+  if (a < SAND_RISE){
+    const e = a / SAND_RISE;
+    return { heightFactor: Math.sin(e * Math.PI * 0.5), warning: 1 };
+  }
+  a -= SAND_RISE;
+  if (a < SAND_PEAK) return { heightFactor: 1, warning: 0 };
+  a -= SAND_PEAK;
+  const e = Math.min(1, a / SAND_FALL);
+  return { heightFactor: Math.cos(e * Math.PI * 0.5), warning: 0 };
+}
+
 function ensureSandHands(){
   if (progressM >= DIFF.sandStart){
     let lastX = sandHands.length ? sandHands[sandHands.length-1].x : cameraX + 1100;
@@ -379,7 +415,9 @@ function ensureSandHands(){
     const spacingRand = Math.max(700, 1700 - p*0.3);
     while (lastX < cameraX + W + 1200){
       lastX += spacingBase + Math.random()*spacingRand;
-      sandHands.push({ x:lastX, hit:false, counted:false });
+      // ciclo propio en el tiempo (no por cercanía): cada mano sube/baja sola,
+      // así se puede leer y esquivar por timing en vez de "emboscar" al llegar.
+      sandHands.push({ x:lastX, hit:false, counted:false, cyclePhase: Math.random()*SAND_CYCLE });
     }
   }
   for (const s of sandHands){
@@ -445,30 +483,6 @@ function ensureScorpions(){
   scorpions = scorpions.filter(s => s.x > cameraX - 500 && !s.defeated);
 }
 
-function ensureCranes(){
-  if (progressM >= DIFF.craneStart){
-    let lastX = cranes.length ? cranes[cranes.length-1].baseX : cameraX + 900;
-    const p = progressM - DIFF.craneStart;
-    const spacingBase = Math.max(1500, 3200 - p*0.4);
-    const spacingRand = Math.max(800, 1600 - p*0.25);
-    while (lastX < cameraX + W + 1200){
-      lastX += spacingBase + Math.random()*spacingRand;
-      const jibLength = 170 + Math.random()*100;
-      const y = groundY - (H*0.35 + Math.random()*H*0.25);
-      const speed = 0.32 + Math.random()*0.22;
-      cranes.push({ baseX:lastX, jibLength, y, speed, phase: Math.random()*10, hookX:lastX, hookY:y });
-    }
-  }
-  cranes = cranes.filter(c => c.baseX > cameraX - 700 && c.baseX < cameraX + W + 2000);
-}
-
-function craneHookAt(worldX, worldY){
-  for (const c of cranes){
-    if (Math.hypot(worldX - c.hookX, worldY - c.hookY) < 26) return c;
-  }
-  return null;
-}
-
 function ensureHelicopter(){
   if (helicopters.length > 0) return;
   if (progressM < DIFF.heliStart) return;
@@ -520,16 +534,15 @@ function tryShootWeb(clientX, clientY){
   const heli = heliAt(p.x, p.y);
   if (heli){
     heli.state = 'riding';
-    heli.rideTimer = 260;
+    heli.rideTimer = 150; // paseo más corto (~2.5s a 60fps) — antes se sentía largo
     player.riding = heli;
     web.active = false;
     pickupMsg = { text: '¡Enganchado al helicóptero! 🚁', timer: 70 };
     return;
   }
 
-  const crane = craneHookAt(p.x, p.y);
   const target = dist >= 10 ? buildingAt(p.x, p.y) : null;
-  if ((target && player.y > groundY - target.height) || crane){
+  if (target && player.y > groundY - target.height){
     web.active = true;
     web.anchor = { x: p.x, y: p.y };
     web.len = dist;
@@ -869,8 +882,9 @@ export function update(){
 
   const sandMaxReach = Math.min(H*0.85, H*0.5 + Math.max(0, progressM - DIFF.sandStart) * 0.05);
   for (const s of sandHands){
-    const local = Math.max(0, Math.min(1, (player.x - (s.x - 150)) / 300));
-    s.heightFactor = Math.sin(local * Math.PI);
+    const cyc = sandCycle(elapsedFrames, s.cyclePhase || 0);
+    s.heightFactor = cyc.heightFactor;
+    s.warning = cyc.warning;
     s.topY = groundY - s.heightFactor * sandMaxReach;
     if (!s.hit && s.heightFactor > 0.3 && Math.abs(player.x - s.x) < 55 && player.y >= s.topY - 12){
       s.hit = true;
@@ -918,11 +932,6 @@ export function update(){
     }
   }
 
-  for (const c of cranes){
-    const sway = Math.sin(t * c.speed + c.phase) * 0.5 + 0.5;
-    c.hookX = c.baseX + sway * c.jibLength;
-    c.hookY = c.y;
-  }
 
   for (const h of helicopters){
     if (h.state === 'flying'){
@@ -989,12 +998,12 @@ export function update(){
   ensureSandHands();
   ensureRhinos();
   ensureScorpions();
-  ensureCranes();
   ensureHelicopter();
 
   score = Math.max(score, Math.floor((player.x - startBuilding.x) / 10));
   document.getElementById('score').textContent = score;
   if (score > best){ best = score; document.getElementById('best').textContent = best; }
+  updateAutoShootHud();
 }
 
 export function triggerGameOver(){

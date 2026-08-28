@@ -1,16 +1,27 @@
 // ============================================================================
-// Héroe: mesh procedural + animación procedural. Fase 2 (pase de arte real) —
-// silueta compuesta (torso ahusado, hombros, brazos/piernas de dos segmentos),
-// materiales toon cel-shaded + "rim light shell" para despegar al personaje del
-// fondo, ojos emisivos reales para las skins con eyeGlow, y poses dedicadas para
-// colgado/vuelo libre/parado/aterrizando. La regla dura sigue intacta: el héroe
-// SIEMPRE vive en sceneZ = 0 (group.position = worldToScene(player.x, player.y),
-// sin offset de Z) — solo el "shell" decorativo del rim light cuelga del mismo
+// Héroe: mesh procedural + animación procedural. Fase 3 (pase anatómico) —
+// sobre la silueta compuesta ya validada (torso ahusado, hombros, brazos/
+// piernas de dos segmentos) se suma: un torso "lathe" con perfil real de
+// pecho/cintura (V-taper marcado + bulto pectoral en la silueta misma, sin
+// geometría extra ni emblemas), más contraste bíceps/antebrazo y muslo/
+// pantorrilla, un pivot de columna (chestPivot) que separa el pecho de la
+// cadera para que el arqueo de espalda y la inclinación al colgar sean curva
+// real y no un torso rígido, cabeza que gira hacia el punto de interés.
+// Fase 4 (pase material): materiales PBR (MeshPhysicalMaterial) en vez de
+// MeshToonMaterial + gradientMap — traje tipo licra/spandex con roughness
+// medio-alto, metalness ~0 y un "sheen" sutil de tela, cinturón en cuero
+// aparte, más un normal map procedural (micro-arrugas, sin patrón) y un mapa
+// de rugosidad procedural (variación de tono/tela muy leve) para romper el
+// look plástico perfecto sin ensuciar el traje. El "rim light shell" (mesh
+// clonado hacia afuera, BackSide + AdditiveBlending) es un efecto aditivo
+// aparte y sigue intacto. La regla dura sigue intacta: el héroe SIEMPRE vive
+// en sceneZ = 0 (group.position = worldToScene(player.x, player.y), sin
+// offset de Z) — solo el "shell" decorativo del rim light cuelga del mismo
 // origen, nunca lo desplaza.
 // ============================================================================
 
 import * as THREE from '../vendor/three/build/three.module.js';
-import { heroGroup, worldToScene, toonGradientMap, rimLight } from './world3d.js';
+import { heroGroup, worldToScene, rimLight } from './world3d.js';
 import * as state from './state.js';
 
 const group = new THREE.Group();
@@ -25,19 +36,132 @@ group.add(bodyPivot);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // ---------------------------------------------------------------------------
-// materiales por skin
+// ruido orgánico suavizado, base compartida para las dos texturas procedurales
+// de tela de abajo (normal map de micro-arrugas + mapa de rugosidad de
+// variación de tono). A propósito NO es una grilla ni nada regular (evita
+// cualquier lectura como red/telaraña).
 // ---------------------------------------------------------------------------
+function buildBlurredNoise(size){
+  const h = new Float32Array(size * size);
+  for (let i = 0; i < h.length; i++) h[i] = Math.random();
+  const blurred = new Float32Array(size * size);
+  for (let y = 0; y < size; y++){
+    for (let x = 0; x < size; x++){
+      let sum = 0;
+      for (let dy = -1; dy <= 1; dy++){
+        for (let dx = -1; dx <= 1; dx++){
+          sum += h[((y + dy + size) % size) * size + ((x + dx + size) % size)];
+        }
+      }
+      blurred[y * size + x] = sum / 9;
+    }
+  }
+  return blurred;
+}
+
+// normal map: solo micro-arrugas de tela, para que el traje deje de verse
+// plástico liso bajo el rim light y el sol. Un único DataTexture compartido
+// por todas las skins (mismo patrón sirve, se tiñe con cada color).
+function buildFabricNormalMap(size = 48){
+  const blurred = buildBlurredNoise(size);
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++){
+    for (let x = 0; x < size; x++){
+      const l = blurred[y * size + ((x - 1 + size) % size)];
+      const r = blurred[y * size + ((x + 1) % size)];
+      const u = blurred[((y - 1 + size) % size) * size + x];
+      const d = blurred[((y + 1) % size) * size + x];
+      const nx = (l - r) * 1.4;
+      const ny = (u - d) * 1.4;
+      const nz = 1;
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      const idx = (y * size + x) * 4;
+      data[idx]     = ((nx / len) * 0.5 + 0.5) * 255;
+      data[idx + 1] = ((ny / len) * 0.5 + 0.5) * 255;
+      data[idx + 2] = ((nz / len) * 0.5 + 0.5) * 255;
+      data[idx + 3] = 255;
+    }
+  }
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 4);
+  tex.needsUpdate = true;
+  return tex;
+}
+const fabricNormalMap = buildFabricNormalMap();
+
+// mapa de rugosidad: variación de tono/arruga MUY leve para que el traje deje
+// de leer como plástico perfectamente uniforme, sin ir al extremo "sucio" o
+// "gastado" (rango angosto, casi todo cerca del máximo — solo motea un poco
+// más brillante en algunas zonas, nunca más rugoso que la base). Tiling
+// distinto al del normal map para que no se lean como el mismo patrón
+// superpuesto dos veces.
+function buildFabricRoughnessMap(size = 32){
+  const blurred = buildBlurredNoise(size);
+  let min = Infinity, max = -Infinity;
+  for (const v of blurred){ if (v < min) min = v; if (v > max) max = v; }
+  const range = Math.max(1e-5, max - min);
+  const data = new Uint8Array(size * size * 4);
+  for (let i = 0; i < size * size; i++){
+    const n = (blurred[i] - min) / range; // 0..1
+    const g = Math.round((0.82 + n * 0.18) * 255); // 0.82..1.0 — nunca más rugoso que la base
+    const idx = i * 4;
+    data[idx] = data[idx + 1] = data[idx + 2] = g;
+    data[idx + 3] = 255;
+  }
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(6, 6);
+  tex.needsUpdate = true;
+  return tex;
+}
+const fabricRoughnessMap = buildFabricRoughnessMap();
+
+// ---------------------------------------------------------------------------
+// materiales por skin — PBR realista. El traje es tela ajustada tipo
+// licra/spandex: roughness medio-alto (no brilla como plástico ni es
+// completamente mate), metalness ~0, con un "sheen" sutil (fibra sintética
+// bajo luz rasante) vía MeshPhysicalMaterial. El cinturón es cuero aparte
+// (más metalness, roughness algo menor, sin sheen de tela). Los ojos
+// emisivos (skins con eyeGlow) siguen siendo MeshBasicMaterial sin cambios —
+// ese comportamiento de "fuente de luz" no se toca acá.
+// ---------------------------------------------------------------------------
+function suitMaterial(color, { roughness, metalness = 0.02, normalScale = 0.3, sheen = 0.25, sheenRoughness = 0.65 } = {}){
+  return new THREE.MeshPhysicalMaterial({
+    color,
+    roughness,
+    metalness,
+    normalMap: fabricNormalMap,
+    normalScale: new THREE.Vector2(normalScale, normalScale),
+    roughnessMap: fabricRoughnessMap,
+    sheen,
+    sheenRoughness,
+    sheenColor: new THREE.Color(0xffffff),
+  });
+}
+
 const materials = state.SKINS.map(s => ({
-  torso:  new THREE.MeshToonMaterial({ color: s.torso,  gradientMap: toonGradientMap }),
-  legs:   new THREE.MeshToonMaterial({ color: s.legs,   gradientMap: toonGradientMap }),
-  accent: new THREE.MeshToonMaterial({ color: s.accent, gradientMap: toonGradientMap }),
-  mask:   new THREE.MeshToonMaterial({
-    color: s.mask, gradientMap: toonGradientMap,
-    emissive: s.eyeGlow ? new THREE.Color(s.eyeColor || '#ffffff') : 0x000000,
-    emissiveIntensity: s.eyeGlow ? 0.12 : 0,
+  // traje: torso/piernas roughness ~0.6-0.65 (licra mate-satinada, no plástico).
+  torso:  suitMaterial(s.torso, { roughness: 0.60, metalness: 0.02, normalScale: 0.35, sheen: 0.25, sheenRoughness: 0.65 }),
+  legs:   suitMaterial(s.legs,  { roughness: 0.65, metalness: 0.02, normalScale: 0.35, sheen: 0.22, sheenRoughness: 0.7 }),
+  // acento (mangas/hombros/detalles): tela un poco más tensa/lisa que el torso.
+  accent: suitMaterial(s.accent, { roughness: 0.55, metalness: 0.03, normalScale: 0.28, sheen: 0.3, sheenRoughness: 0.6 }),
+  // máscara: misma familia de tela que el torso, arruga más sutil (más ceñida).
+  mask: (() => {
+    const m = suitMaterial(s.mask, { roughness: 0.58, metalness: 0.02, normalScale: 0.18, sheen: 0.2, sheenRoughness: 0.65 });
+    m.emissive = s.eyeGlow ? new THREE.Color(s.eyeColor || '#ffffff') : new THREE.Color(0x000000);
+    m.emissiveIntensity = s.eyeGlow ? 0.12 : 0;
+    return m;
+  })(),
+  // cinturón: cuero — roughness medio, casi sin metal, sin sheen de tela ni
+  // el normal map de micro-arrugas (grano de cuero mucho más sutil).
+  belt: new THREE.MeshStandardMaterial({
+    color: s.accent, roughness: 0.5, metalness: 0.06,
+    normalMap: fabricNormalMap, normalScale: new THREE.Vector2(0.12, 0.12),
   }),
   eyeGlow: s.eyeGlow ? new THREE.MeshBasicMaterial({ color: s.eyeColor || '#ffffff', toneMapped: false }) : null,
-  eyeFlat: new THREE.MeshToonMaterial({ color: '#f0f0f4', gradientMap: toonGradientMap }),
+  // ojos no-emisivos: lente clara, algo brillante (no fabric, no toon).
+  eyeFlat: new THREE.MeshStandardMaterial({ color: '#f0f0f4', roughness: 0.3, metalness: 0.05 }),
   core: s.eyeGlow ? new THREE.MeshBasicMaterial({ color: s.eyeColor || '#ffffff', toneMapped: false, transparent: true, opacity: 0.9 }) : null,
 }));
 
@@ -50,31 +174,44 @@ const rimMat = new THREE.MeshBasicMaterial({
 });
 
 // ---------------------------------------------------------------------------
-// geometría — proporciones de héroe estilizado low-poly (cabeza más chica que
-// el torso, hombros anchos, cintura angosta, brazos/piernas de dos segmentos)
+// geometría — proporciones de héroe atlético estilizado (cabeza más chica que
+// el torso, hombros notablemente más anchos que la cintura, bíceps más grueso
+// que el antebrazo, muslo más grueso que la pantorrilla).
 // ---------------------------------------------------------------------------
 // Nota de proporciones: player.radius (14, en state.js) es solo un radio de
-// colisión de gameplay, no un bounding box visual — el mesh original (single-
-// capsule) ya asentaba los pies ~10u por debajo de esa referencia al aterrizar
-// y así quedó validado en la fase esqueleto. Con brazos/piernas de dos
-// segmentos apuntamos a una silueta compacta y "chunky" (a tono con el low-poly
-// premium cel-shaded, no realista-esbelto) que se queda cerca de esa misma
-// profundidad de pie para no desalinear el aterrizaje.
+// colisión de gameplay, no un bounding box visual. La cadena pierna
+// (cadera->rodilla->pie) fue recalibrada para engrosar el muslo y afinar la
+// pantorrilla, pero la distancia total cadera->planta del pie se mantuvo casi
+// idéntica a la fase anterior (~16u) a propósito, para no desalinear el punto
+// de contacto visual con el suelo al aterrizar.
 const hipsGeo    = new THREE.CapsuleGeometry(5.6, 2, 3, 8);
-const beltGeo     = new THREE.TorusGeometry(6, 0.9, 6, 14);
-const torsoGeo    = new THREE.CylinderGeometry(7.6, 5.4, 13, 8, 1, false);
-const deltoidGeo  = new THREE.SphereGeometry(3.2, 10, 8);
+const beltGeo     = new THREE.TorusGeometry(5.3, 0.85, 6, 14);
+// torso "lathe": perfil real cintura->costillas->pecho->clavícula en vez de
+// un cono liso — el bulto en el medio (pecho) y el afinado en la base
+// (cintura) leen como volumen muscular sugerido, sin geometría separada.
+const torsoGeo = new THREE.LatheGeometry([
+  new THREE.Vector2(4.6, -4.0),  // dobladillo / cintura
+  new THREE.Vector2(5.2, -1.5),  // costillas bajas
+  new THREE.Vector2(7.0, 1.4),   // ensanche hacia el pecho
+  new THREE.Vector2(8.1, 3.9),   // pico pectoral (punto más ancho)
+  new THREE.Vector2(7.4, 6.2),   // pecho alto / hacia la clavícula
+  new THREE.Vector2(6.4, 8.6),   // base del hombro (clavícula)
+], 8);
+const deltoidGeo  = new THREE.SphereGeometry(3.5, 10, 8);
 const headGeo     = new THREE.SphereGeometry(6.3, 14, 12);
 const browGeo     = new THREE.BoxGeometry(7.2, 1.5, 2.1);
-const shoulderGuardGeo = new THREE.ConeGeometry(3, 3.6, 6);
+const shoulderGuardGeo = new THREE.ConeGeometry(3.2, 3.8, 6);
 
-const upperArmGeo = new THREE.CapsuleGeometry(2.5, 4, 3, 6);
-const forearmGeo  = new THREE.CapsuleGeometry(2.1, 4, 3, 6);
-const handGeo     = new THREE.SphereGeometry(2.1, 8, 6);
+// bíceps notablemente más grueso que el antebrazo (antes casi iguales).
+const upperArmGeo = new THREE.CapsuleGeometry(2.9, 4.4, 3, 8);
+const forearmGeo  = new THREE.CapsuleGeometry(2.0, 4.2, 3, 8);
+const handGeo     = new THREE.SphereGeometry(2.3, 8, 6);
 
-const thighGeo = new THREE.CapsuleGeometry(2.8, 3, 3, 6);
-const shinGeo  = new THREE.CapsuleGeometry(2.3, 3, 3, 6);
-const footGeo  = new THREE.BoxGeometry(4.4, 2.2, 6.2);
+// muslo notablemente más grueso que la pantorrilla (largo total muslo+
+// pantorrilla ~igual a la fase anterior, ver nota arriba).
+const thighGeo = new THREE.CapsuleGeometry(3.2, 2.6, 3, 8);
+const shinGeo  = new THREE.CapsuleGeometry(1.9, 3.2, 3, 8);
+const footGeo  = new THREE.BoxGeometry(4.6, 2.3, 6.4);
 
 const eyeGeo = new THREE.SphereGeometry(1.9, 10, 8);
 const coreGeo = new THREE.SphereGeometry(1.5, 8, 8);
@@ -82,25 +219,33 @@ const coreGeo = new THREE.SphereGeometry(1.5, 8, 8);
 // tronco -------------------------------------------------------------------
 const hips = new THREE.Mesh(hipsGeo, materials[0].torso);
 hips.position.set(0, -8, 0);
-const belt = new THREE.Mesh(beltGeo, materials[0].accent);
+const belt = new THREE.Mesh(beltGeo, materials[0].belt);
 belt.position.set(0, -2, 0);
 belt.rotation.x = Math.PI / 2;
+
+// chestPivot: pivot de columna independiente de la cadera. Todo lo que va
+// "arriba de la cintura" (torso, hombros, brazos, cabeza) cuelga de acá, así
+// el pecho puede arquearse/inclinarse con curva real sin arrastrar cadera ni
+// piernas — esa era la limitación de la fase anterior (torso rígido).
+const chestPivot = new THREE.Group();
+chestPivot.position.set(0, 2, 0);
+
 const torso = new THREE.Mesh(torsoGeo, materials[0].torso);
-torso.position.set(0, 5, 0);
+torso.position.set(0, 0, 0);
 const deltoidR = new THREE.Mesh(deltoidGeo, materials[0].accent);
-deltoidR.position.set(8.2, 11, 0);
+deltoidR.position.set(9.1, 9.0, 0);
 const deltoidL = new THREE.Mesh(deltoidGeo, materials[0].accent);
-deltoidL.position.set(-8.2, 11, 0);
+deltoidL.position.set(-9.1, 9.0, 0);
 const shoulderGuard = new THREE.Mesh(shoulderGuardGeo, materials[0].accent);
-shoulderGuard.position.set(8.2, 13, 0);
+shoulderGuard.position.set(9.1, 10.8, 0);
 shoulderGuard.rotation.z = -0.35;
 
 const core = new THREE.Mesh(coreGeo, materials[0].core || materials[0].accent);
-core.position.set(0, 6, 7);
+core.position.set(0, 3.9, 7);
 
 // cabeza (grupo propio para poder inclinarla independiente del torso) ------
 const headGroup = new THREE.Group();
-headGroup.position.set(0, 17, 0);
+headGroup.position.set(0, 14.3, 0);
 const head = new THREE.Mesh(headGeo, materials[0].mask);
 head.scale.set(1, 1.05, 0.92);
 const brow = new THREE.Mesh(browGeo, materials[0].accent);
@@ -122,15 +267,17 @@ headGroup.add(head, brow, eyeR, eyeL);
 // ni superposiciones raras entre segmentos.
 function buildArm(sign){
   const shoulder = new THREE.Group();
-  shoulder.position.set(8.4 * sign, 10.6, 0);
+  shoulder.position.set(9.3 * sign, 8.6, 0);
   const upperArm = new THREE.Mesh(upperArmGeo, materials[0].accent);
-  upperArm.position.set(0, -4.5, 0);
+  upperArm.position.set(0, -5.1, 0);
   const elbow = new THREE.Group();
-  elbow.position.set(0, -9, 0);
+  elbow.position.set(0, -10.2, 0);
   const forearm = new THREE.Mesh(forearmGeo, materials[0].accent);
   forearm.position.set(0, -4.1, 0);
   const hand = new THREE.Mesh(handGeo, materials[0].accent);
   hand.position.set(0, -8.2, 0);
+  // mano ligeramente achatada/alargada en vez de bocha esférica genérica.
+  hand.scale.set(1, 1.15, 0.75);
   elbow.add(forearm, hand);
   shoulder.add(upperArm, elbow);
   return { shoulder, elbow, upperArm, forearm, hand };
@@ -143,13 +290,13 @@ function buildLeg(sign){
   const hip = new THREE.Group();
   hip.position.set(4 * sign, -11, 0);
   const thigh = new THREE.Mesh(thighGeo, materials[0].legs);
-  thigh.position.set(0, -4.3, 0);
+  thigh.position.set(0, -4.5, 0);
   const knee = new THREE.Group();
-  knee.position.set(0, -8.6, 0);
+  knee.position.set(0, -9.0, 0);
   const shin = new THREE.Mesh(shinGeo, materials[0].legs);
-  shin.position.set(0, -3.8, 0);
+  shin.position.set(0, -3.5, 0);
   const foot = new THREE.Mesh(footGeo, materials[0].legs);
-  foot.position.set(0, -6.5, 1.5);
+  foot.position.set(0, -6.0, 1.5);
   knee.add(shin, foot);
   hip.add(thigh, knee);
   return { hip, knee, thigh, shin, foot };
@@ -157,14 +304,17 @@ function buildLeg(sign){
 const legR = buildLeg(1);
 const legL = buildLeg(-1);
 
-bodyPivot.add(
-  hips, belt, torso, deltoidR, deltoidL, shoulderGuard, core, headGroup,
-  armR.shoulder, armL.shoulder, legR.hip, legL.hip
+chestPivot.add(
+  torso, deltoidR, deltoidL, shoulderGuard, core, headGroup,
+  armR.shoulder, armL.shoulder
 );
+bodyPivot.add(hips, belt, chestPivot, legR.hip, legL.hip);
 
 // rim-light shell: copias ligeramente escaladas hacia afuera del torso/cabeza/
-// cadera, cara interna visible (BackSide) con blending aditivo — el borde que
-// asoma detrás de la silueta lee como luz de contorno real bajo el bloom.
+// hombros/cadera, cara interna visible (BackSide) con blending aditivo — el
+// borde que asoma detrás de la silueta lee como luz de contorno real bajo el
+// bloom. Mismo material/helper que la fase anterior, solo se reusa para los
+// hombros (ahora más anchos) además de torso/cabeza/cadera.
 function buildShell(geo, worldPosition, rotation, extraScale){
   const shell = new THREE.Mesh(geo, rimMat);
   shell.position.copy(worldPosition);
@@ -174,9 +324,13 @@ function buildShell(geo, worldPosition, rotation, extraScale){
   shell.receiveShadow = false;
   return shell;
 }
-bodyPivot.add(
+chestPivot.add(
   buildShell(torsoGeo, torso.position),
   buildShell(headGeo, headGroup.position, head.rotation, head.scale),
+  buildShell(deltoidGeo, deltoidR.position),
+  buildShell(deltoidGeo, deltoidL.position),
+);
+bodyPivot.add(
   buildShell(hipsGeo, hips.position),
 );
 
@@ -198,7 +352,7 @@ function applySkin(i){
 
   torso.material = m.torso;
   hips.material = m.torso;
-  belt.material = m.accent;
+  belt.material = m.belt;
   deltoidR.material = deltoidL.material = m.accent;
   shoulderGuard.material = m.accent;
   head.material = m.mask;
@@ -250,9 +404,12 @@ export function update(){
   let lean = 0;
 
   if (state.web.active && state.web.anchor){
-    // colgado de la telaraña: el brazo apunta al anchor real y el torso entero
-    // se inclina un poco hacia esa dirección para que se lea como tensión
-    // física del hilo, no como un brazo suelto rotando en el aire.
+    // colgado de la telaraña: el brazo apunta al anchor real y el CUERPO
+    // ENTERO se inclina hacia esa dirección, pero no como bloque rígido —
+    // el pecho (chestPivot) inclina más que la cadera/piernas, como si el
+    // tirón del hilo pasara primero por el torso superior, y además se
+    // pliega levemente hacia adelante (peso colgando de un solo brazo) en
+    // vez de quedar parado en el aire.
     const facing = p.facing >= 0 ? 1 : -1;
     const ang = Math.atan2(state.web.anchor.y - p.y, (state.web.anchor.x - p.x) * facing);
     armR.shoulder.rotation.z = -ang;
@@ -268,10 +425,16 @@ export function update(){
     legR.knee.rotation.z = -0.95;
     legL.knee.rotation.z = -0.7;
 
-    headGroup.rotation.z = lean * 0.4;
+    chestPivot.rotation.z = lean * 0.55;
+    chestPivot.rotation.x = 0.18 + Math.abs(lean) * 0.12;
+
+    headGroup.rotation.z = lean * 0.35;
+    headGroup.rotation.x = clamp(-ang * 0.2, -0.35, 0.35);
   } else if (!p.grounded){
     // vuelo libre (salto, caída, después de soltar la telaraña): postura
-    // dinámica de carrera aérea en vez de un tijereteo simétrico plano.
+    // dinámica de carrera aérea en vez de un tijereteo simétrico plano, con
+    // arqueo real de columna (pecho arriba/atrás al subir, se pliega hacia
+    // adelante al caer) en vez de un torso rígido siguiendo a las extremidades.
     const t = now / 300;
     const cycle = Math.sin(t);
     legR.hip.rotation.z = cycle * 0.55;
@@ -285,10 +448,17 @@ export function update(){
     armL.elbow.rotation.z = -0.5;
 
     lean = clamp(-vx * 0.03, -0.3, 0.3) + clamp(-vy * 0.01, -0.15, 0.15);
+
+    const vyArch = clamp(-vy * 0.05, -0.3, 0.3);
+    chestPivot.rotation.x = -0.15 + vyArch;
+    chestPivot.rotation.z = lean * 0.4 + Math.sin(t * 0.5) * 0.04;
+
     headGroup.rotation.z = lean * 0.3;
+    headGroup.rotation.x = clamp(vy * 0.02, -0.25, 0.25);
   } else {
     // parado / aterrizando: caminata si hay input horizontal, si no, idle
-    // con respiración sutil.
+    // con respiración sutil (ahora visible como leve sube-baja del pecho,
+    // no solo de los brazos).
     const moving = state.keys && (state.keys.left || state.keys.right);
     if (moving){
       const wt = now / 140;
@@ -299,6 +469,9 @@ export function update(){
       armR.shoulder.rotation.z = -Math.sin(wt) * 0.4 + 0.25;
       armL.shoulder.rotation.z = Math.sin(wt) * 0.4 - 0.25;
       armR.elbow.rotation.z = armL.elbow.rotation.z = -0.5;
+
+      chestPivot.rotation.z = Math.sin(wt) * 0.06;
+      chestPivot.rotation.x = 0.02;
     } else {
       const breathe = Math.sin(now / 900) * 0.02;
       legR.hip.rotation.z = 0.06;
@@ -309,8 +482,12 @@ export function update(){
       armL.shoulder.rotation.z = -0.4 - breathe;
       armR.elbow.rotation.z = -0.35;
       armL.elbow.rotation.z = -0.45;
+
+      chestPivot.rotation.z = 0;
+      chestPivot.rotation.x = 0.03 + breathe * 1.5;
     }
     headGroup.rotation.z = 0;
+    headGroup.rotation.x = 0;
   }
 
   bodyPivot.rotation.z = lean;

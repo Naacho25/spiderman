@@ -22,7 +22,15 @@ import { getSkyState } from './skystate.js';
 // ---------- tier de calidad ----------
 function detectQualityTier(){
   const ua = navigator.userAgent || '';
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+  const isMobileUA = /Android|iPhone|iPad|iPod/i.test(ua);
+  // iPadOS 13+ manda un User-Agent de escritorio (sin "iPad") por defecto —
+  // sin este chequeo un iPad real cae del lado "desktop" del heurístico y
+  // puede terminar en tier 'high' (sombras + bloom a resolución completa),
+  // que su GPU integrada sin ventilación activa no sostiene igual que un
+  // desktop de verdad. maxTouchPoints>1 en 'MacIntel' es el indicador
+  // estándar para distinguir un iPad real de un Mac real.
+  const isIpadOS13 = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  const isMobile = isMobileUA || isIpadOS13;
   const cores = navigator.hardwareConcurrency || 4;
   if (isMobile) return cores >= 6 ? 'mid' : 'low';
   return cores >= 8 ? 'high' : 'mid';
@@ -33,6 +41,30 @@ export const TIER = {
   mid:  { pixelRatio: Math.min(devicePixelRatio || 1, 2), bloom: true, bloomRes: 0.75, shadows: false, particleScale: 0.75 },
   high: { pixelRatio: Math.min(devicePixelRatio || 1, 2), bloom: true, bloomRes: 1.0, shadows: true, particleScale: 1 },
 }[qualityTier];
+
+// ---------- chequeo de soporte antes de crear el renderer ----------
+// three.js r169 requiere WebGL2 sin fallback a WebGL1 — si el navegador no lo
+// soporta (iOS viejo pre-15, webviews embebidos raros), new THREE.WebGLRenderer()
+// tira una excepción no capturada y la pantalla queda en negro sin explicación.
+// Mejor cortar acá con un mensaje amigable en español, mismo tono que el resto.
+function checkWebGL2Support(){
+  try {
+    const testCanvas = document.createElement('canvas');
+    return !!(testCanvas.getContext('webgl2'));
+  } catch (e) { return false; }
+}
+if (!checkWebGL2Support()){
+  const msg = document.createElement('div');
+  msg.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;' +
+    'flex-direction:column;gap:10px;padding:24px;box-sizing:border-box;text-align:center;' +
+    'background:#0a0612;color:#fff;font-family:"Segoe UI",Arial,sans-serif;z-index:9999;';
+  msg.innerHTML = '<div style="font-size:22px;font-weight:800;">😕 Tu navegador no es compatible</div>' +
+    '<div style="font-size:15px;color:#ccc;max-width:420px;">Trepamuros necesita WebGL2 para funcionar. ' +
+    'Probá actualizar tu navegador o abrir el juego en Chrome/Safari en su versión más reciente.</div>';
+  document.body.innerHTML = '';
+  document.body.appendChild(msg);
+  throw new Error('WebGL2 no soportado — juego detenido antes de crear el renderer.');
+}
 
 // ---------- escena / renderer ----------
 export const scene = new THREE.Scene();
@@ -58,10 +90,13 @@ export const vfxGroup = new THREE.Group(); scene.add(vfxGroup);
 // FOV fijo, cámara siempre perpendicular al plano de juego (z=0). Esto es lo que
 // garantiza que el raycast a z=0 sea *exacto*, no una aproximación (ver arriba).
 const FOV_Y_DEG = 42;
-const FOV_Y_RAD = FOV_Y_DEG * Math.PI / 180;
+export const FOV_Y_RAD = FOV_Y_DEG * Math.PI / 180;
 export const camera = new THREE.PerspectiveCamera(FOV_Y_DEG, W / H, 1, 8000);
 
-function camDistanceForHeight(h){ return (h / 2) / Math.tan(FOV_Y_RAD / 2); }
+// exportada: city.js la usa para dimensionar el domo de cielo exactamente al
+// tamaño del frustum a cualquier profundidad (así el gradiente no queda
+// "aplastado" contra un plano más grande que lo que realmente se ve)
+export function camDistanceForHeight(h){ return (h / 2) / Math.tan(FOV_Y_RAD / 2); }
 
 // ---------- transform mundo(x,y invertido en Y, y=abajo) <-> escena (Y arriba) ----------
 export function worldToScene(x, y, z = 0){

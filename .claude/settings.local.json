@@ -7,7 +7,17 @@
       "Bash(py --version)",
       "Bash(node --check src/enemies3d.js)",
       "Bash(node --check src/hero.js)",
-      "PowerShell(node --check \"src/hero.js\")"
+      "PowerShell(node --check \"src/hero.js\")",
+      "Bash(node --check src/vfx.js)",
+      "Bash(node --input-type=module -e \"console.log\\('checking syntax only, module resolution may fail which is expected'\\)\")",
+      "PowerShell(node --check \"C:\\\\Users\\\\usuario\\\\Desktop\\\\SPIDERMAN - code\\\\src\\\\vfx.js\")",
+      "Bash(node --input-type=module --check)",
+      "Bash(python3 -c ' *)",
+      "Bash(node --check src/city.js)",
+      "Bash(node --check src/world3d.js)",
+      "Bash(node --check src/main.js)",
+      "PowerShell(Get-Command node -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Command npx -ErrorAction SilentlyContinue)"
     ]
   }
 }
