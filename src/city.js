@@ -105,6 +105,26 @@ function windowTexture(seed, bgColor){
   return tex;
 }
 
+// mismos dos patrones planos (blanco/negro, CC0, "Pattern Pack" de Kenney.nl:
+// https://kenney.nl/assets/pattern-pack) que ya usamos para autos/gente —
+// acá van como `map` (diffuse) de la fachada en vez de un color sólido. Son
+// máscaras blanco/negro puras: MeshStandardMaterial multiplica `map` por
+// `color`, así que el ladrillo/bloque queda teñido con el color de
+// WALL_STYLES de siempre (blanco del PNG -> color de la pared, negro de la
+// junta -> negro), sin tener que hornear un color por textura. No reemplaza
+// la iluminación dinámica de ventanas (esa sigue siendo el emissiveMap de
+// windowTexture() de siempre) — son dos texturas independientes en el mismo
+// material.
+const textureLoader = new THREE.TextureLoader();
+function loadPatternTex(name){
+  const tex = textureLoader.load(`/vendor/kenney/patterns/${name}.png`);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const brickPatternTex = loadPatternTex('brick'); // hiladas de ladrillo prolijas
+const blockPatternTex = loadPatternTex('block'); // bloques más grandes, lee como piedra/panel
+
 // paleta "Jetpack Joyride" tipo juguete: colores planos y MUY saturados
 // (piedra clara, ladrillo/terracota, tostados cálidos y vidrio verde-azulado/
 // celeste), sin las texturas de detalle "realista" que tenía la ronda
@@ -113,17 +133,19 @@ function windowTexture(seed, bgColor){
 // (piedra/ladrillo) para aplanar cualquier especular sutil; el vidrio se
 // queda con roughness bajo nada más para que un highlight puntual del sol lo
 // distinga de la piedra — no hay reflejos de entorno reales en este proyecto,
-// así que no vale la pena perseguir más "fotorrealismo" ahí.
+// así que no vale la pena perseguir más "fotorrealismo" ahí. `pattern` marca
+// qué textura de Kenney va en el `map` (null en el vidrio: un panel de vidrio
+// real es liso, no tiene mampostería que dibujar).
 const WALL_STYLES = [
-  { color: '#f5dd6e', roughness: 0.9, metalness: 0.02 },  // piedra clara / crema, bien saturada
-  { color: '#5b8fd6', roughness: 0.88, metalness: 0.03 }, // "piedra" azul saturado (reemplaza el gris apagado)
-  { color: '#e0431f', roughness: 0.88, metalness: 0.02 }, // ladrillo terracota vivo
-  { color: '#d97f1e', roughness: 0.86, metalness: 0.02 }, // marrón/naranja tostado cálido
-  { color: '#1fd9c4', roughness: 0.12, metalness: 0.5 },  // vidrio verde-azulado saturado
-  { color: '#29c3f0', roughness: 0.1, metalness: 0.55 },  // vidrio celeste saturado
-  { color: '#f0b429', roughness: 0.86, metalness: 0.02 }, // tostado/crema cálido saturado
-  { color: '#0f9e6a', roughness: 0.14, metalness: 0.45 }, // vidrio verde saturado
-  { color: '#ff4423', roughness: 0.5, metalness: 0.1 },   // panel esmaltado rojo/naranja (raro, tipo landmark)
+  { color: '#f5dd6e', roughness: 0.9, metalness: 0.02, pattern: 'block' },  // piedra clara / crema, bien saturada
+  { color: '#5b8fd6', roughness: 0.88, metalness: 0.03, pattern: 'block' }, // "piedra" azul saturado (reemplaza el gris apagado)
+  { color: '#e0431f', roughness: 0.88, metalness: 0.02, pattern: 'brick' }, // ladrillo terracota vivo
+  { color: '#d97f1e', roughness: 0.86, metalness: 0.02, pattern: 'brick' }, // marrón/naranja tostado cálido
+  { color: '#1fd9c4', roughness: 0.12, metalness: 0.5, pattern: null },    // vidrio verde-azulado saturado
+  { color: '#29c3f0', roughness: 0.1, metalness: 0.55, pattern: null },    // vidrio celeste saturado
+  { color: '#f0b429', roughness: 0.86, metalness: 0.02, pattern: 'block' }, // tostado/crema cálido saturado
+  { color: '#0f9e6a', roughness: 0.14, metalness: 0.45, pattern: null },   // vidrio verde saturado
+  { color: '#ff4423', roughness: 0.5, metalness: 0.1, pattern: 'block' },  // panel esmaltado rojo/naranja (raro, tipo landmark)
 ];
 
 function tintedWallColor(seedX){
@@ -136,12 +158,14 @@ function makeFacadeMaterial(width, height, style, seed){
   const tex = windowTexture(seed);
   tex.repeat.set(Math.max(1, Math.round(width / 40)), Math.max(1, Math.round(height / 45)));
   // acepta un string (color plano, criterio viejo) o un objeto de estilo
-  // {color, roughness, metalness} (criterio nuevo, ver WALL_STYLES) — así los
-  // landmarks pueden seguir pasando su propio hex sin romper la firma.
+  // {color, roughness, metalness, pattern} (criterio nuevo, ver WALL_STYLES)
+  // — así los landmarks pueden seguir pasando su propio hex sin romper la
+  // firma (quedan sin `map`, pared lisa, como antes).
   const isStyleObj = typeof style === 'object' && style !== null;
   const baseColor = isStyleObj ? style.color : style;
   const roughness = isStyleObj && style.roughness != null ? style.roughness : 0.9;
   const metalness = isStyleObj && style.metalness != null ? style.metalness : 0.03;
+  const pattern = isStyleObj ? style.pattern : null;
   // sin bumpMap: la superficie queda perfectamente plana a propósito (look
   // cartoon), y de paso es una textura menos por edificio para samplear.
   const params = {
@@ -151,6 +175,19 @@ function makeFacadeMaterial(width, height, style, seed){
     emissiveIntensity: 0.5,
     roughness, metalness,
   };
+  if (pattern){
+    // clon liviano (comparte la imagen ya decodificada, solo duplica el
+    // Texture para poder tener un `repeat` propio por edificio) — mismo
+    // criterio que ya usa windowTexture() de crear una textura por edificio.
+    const base = pattern === 'brick' ? brickPatternTex : blockPatternTex;
+    const map = base.clone();
+    map.needsUpdate = true;
+    // 1 "ladrillo" cada ~18-22 unidades de mundo: suficientemente chico para
+    // leerse como mampostería real a la distancia de juego, sin volverse un
+    // ruido ilegible en edificios angostos.
+    map.repeat.set(Math.max(1, Math.round(width / 20)), Math.max(1, Math.round(height / 18)));
+    params.map = map;
+  }
   return new THREE.MeshStandardMaterial(params);
 }
 
@@ -261,9 +298,9 @@ function buildEmpire(b){
   // violeta apagado — tonos ligeramente distintos entre escalones para dar
   // algo de relieve, todos dentro de la misma familia "maqueta pulida".
   const stepStyles = [
-    { color: '#f5dd6e', roughness: 0.9, metalness: 0.02 },
-    { color: '#f0cf4a', roughness: 0.88, metalness: 0.02 },
-    { color: '#e8c02e', roughness: 0.86, metalness: 0.03 },
+    { color: '#f5dd6e', roughness: 0.9, metalness: 0.02, pattern: 'block' },
+    { color: '#f0cf4a', roughness: 0.88, metalness: 0.02, pattern: 'block' },
+    { color: '#e8c02e', roughness: 0.86, metalness: 0.03, pattern: 'block' },
   ];
   const steps = [
     { w: b.width, h: b.height * 0.55, y: 0 },
@@ -761,11 +798,15 @@ export function update(){
       // esos acá. La textura de ventanas (emissiveMap) SÍ es única por edificio
       // (windowTexture() genera un CanvasTexture nuevo cada vez) y material.dispose()
       // no la libera solo — hay que disponerla a mano o queda filtrando GPU/canvas
-      // memory edificio tras edificio.
+      // memory edificio tras edificio. El `map` de ladrillo/bloque es un
+      // `.clone()` del patrón compartido (brickPatternTex/blockPatternTex) solo
+      // para poder tener su propio `repeat` — dispose() acá libera nada más la
+      // textura GPU de ESE clon, no la imagen fuente compartida.
       rec.group.traverse(o => {
         if (o.geometry && !SHARED_ROOF_GEOMETRIES.has(o.geometry)) o.geometry.dispose();
         if (o.material && !SHARED_ROOF_MATERIALS.has(o.material)){
           if (o.material.emissiveMap) o.material.emissiveMap.dispose();
+          if (o.material.map) o.material.map.dispose();
           o.material.dispose();
         }
       });
