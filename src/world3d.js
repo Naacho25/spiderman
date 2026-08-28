@@ -218,35 +218,48 @@ onResize();
 // núcleos) que pueden estar equivocadas para un hardware puntual (GPU
 // integrada débil, aceleración por hardware desactivada en el navegador,
 // etc. — no hay forma de detectar eso de antemano). Esto mide el tiempo real
-// de frame en vivo y, si el juego va lento de verdad, va bajando el costo de
-// render en pasos concretos — nunca vuelve a subir (evita parpadear entre
-// calidades), y nunca actúa sobre los primeros ~2s (esa ventana suele tener
-// hitches de compilación de shaders que no reflejan el rendimiento real).
-const WARMUP_FRAMES = 120;
+// de frame en vivo y, si el juego va lento de verdad, baja el costo de render.
+//
+// OJO — bug real de la primera versión de esto: medía por CANTIDAD DE FRAMES
+// (esperar 120 frames de warmup + otros 90 para el primer chequeo). Con FPS
+// realmente bajo (que es justo el caso que esto tiene que resolver), esos
+// ~210 frames pueden tardar 20+ segundos REALES en juntarse — el jugador ya
+// decidió "no es jugable" mucho antes de que el sistema llegara a reaccionar.
+// Ahora warmup/chequeo son por TIEMPO REAL (`performance.now()`), no por
+// cantidad de frames: reacciona en 1-2 segundos sin importar cuán lento vaya,
+// y si el frame promedio es MUY malo salta varios escalones de una en vez de
+// probar de a uno. Nunca vuelve a subir (evita parpadear entre calidades).
+const WARMUP_MS = 1200; // ventana inicial: hitches de compilación de shaders, no cuentan
+const CHECK_INTERVAL_MS = 1000; // reevalúa cada ~1s de tiempo real
 const BAD_FRAME_MS = 1000 / 27; // por debajo de ~27fps sostenido, degradar
-const CHECK_WINDOW = 90; // reevalúa cada ~90 frames de juego real
-let frameCount = 0, frameTimeAccum = 0, lastFrameAt = 0, downgradeStep = 0;
+let startedAt = 0, windowStart = 0, windowFrames = 0, windowTimeSum = 0, downgradeStep = 0;
 const DOWNGRADE_STEPS = [
   () => { bloomPass.enabled = false; },
   () => { renderer.setPixelRatio(1); composer.setPixelRatio(1); },
   () => { renderScale = 0.75; onResize(); },
   () => { renderScale = 0.55; onResize(); },
+  () => { renderScale = 0.4; onResize(); },
 ];
+let lastFrameAt = 0;
 function reportFrameTime(){
   const now = performance.now();
-  if (lastFrameAt === 0){ lastFrameAt = now; return; }
+  if (lastFrameAt === 0){ lastFrameAt = now; startedAt = now; windowStart = now; return; }
   const dt = now - lastFrameAt;
   lastFrameAt = now;
-  frameCount++;
-  if (frameCount <= WARMUP_FRAMES) return;
-  frameTimeAccum += dt;
-  if (frameCount % CHECK_WINDOW === 0){
-    const avg = frameTimeAccum / CHECK_WINDOW;
-    frameTimeAccum = 0;
-    if (avg > BAD_FRAME_MS && downgradeStep < DOWNGRADE_STEPS.length){
-      DOWNGRADE_STEPS[downgradeStep]();
-      downgradeStep++;
-    }
+  if (now - startedAt < WARMUP_MS) return;
+  windowFrames++;
+  windowTimeSum += dt;
+  if (now - windowStart < CHECK_INTERVAL_MS) return;
+  const avg = windowTimeSum / Math.max(1, windowFrames);
+  windowStart = now; windowFrames = 0; windowTimeSum = 0;
+  if (avg <= BAD_FRAME_MS || downgradeStep >= DOWNGRADE_STEPS.length) return;
+  // tan lento que ni el escalón inmediato alcanzaría (ej. <15fps): saltar
+  // directo unos escalones más en vez de ir de a uno y hacer sufrir varios
+  // segundos más de espera entre cada mini-mejora.
+  const severity = avg > BAD_FRAME_MS * 2.2 ? 3 : avg > BAD_FRAME_MS * 1.5 ? 2 : 1;
+  for (let i = 0; i < severity && downgradeStep < DOWNGRADE_STEPS.length; i++){
+    DOWNGRADE_STEPS[downgradeStep]();
+    downgradeStep++;
   }
 }
 
