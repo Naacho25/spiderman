@@ -858,6 +858,11 @@ function updatePeds(tsec){
   pedHeadMesh.instanceMatrix.needsUpdate = true;
 }
 
+// margen fuera de los bordes visibles donde igual se sigue dibujando un
+// edificio (evita que aparezca/desaparezca de golpe justo en el borde de
+// pantalla) — más allá de esto, ni siquiera vale la pena el draw call.
+const VISIBILITY_MARGIN = 150;
+
 export function update(){
   const alive = new Set();
   for (const b of state.buildings){
@@ -867,7 +872,13 @@ export function update(){
       rec = makeBuildingMesh(b);
       meshByBuilding.set(b, rec);
     }
-    positionBuildingMesh(rec, b);
+    // costo real de CPU: state.js mantiene edificios "en cola" bastante más
+    // allá del borde de cámara (para que el streaming no se note) — sin este
+    // corte, cada uno de esos ya se estaba dibujando en cada frame aunque no
+    // se viera nada. `visible=false` en Three.js salta el draw call entero.
+    rec.group.visible = b.x + b.width > state.cameraX - VISIBILITY_MARGIN &&
+                         b.x < state.cameraX + state.W + VISIBILITY_MARGIN;
+    if (rec.group.visible) positionBuildingMesh(rec, b);
   }
   for (const [b, rec] of meshByBuilding){
     if (!alive.has(b)){
@@ -893,6 +904,7 @@ export function update(){
   const tsec = performance.now() / 1000;
   const warmth = sky.isNight ? 1.35 : 0.5;
   for (const rec of meshByBuilding.values()){
+    if (!rec.group.visible) continue; // fuera de cámara: no vale la pena animar ventanas/neón
     for (const mat of rec.warmMats) mat.emissiveIntensity = warmth;
     if (rec.group.userData.neonSigns){
       for (const sign of rec.group.userData.neonSigns){

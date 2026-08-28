@@ -19,6 +19,16 @@ import * as state from './state.js';
 
 const isLowTier = qualityTier === 'low';
 
+// margen fuera de cámara donde igual se sigue animando (evita pop-in justo en
+// el borde) — costo real de CPU: la mayoría de estos enemigos tienen animación
+// trigonométrica por frame en varias piezas (brazos, cola, patas...); saltarla
+// del todo para lo que ni se ve es la optimización de más impacto acá, sin
+// tocar gameplay (el objeto sigue existiendo en `state.js`, solo no se dibuja).
+const VISIBILITY_MARGIN = 200;
+function isNearCamera(x){
+  return x > state.cameraX - VISIBILITY_MARGIN && x < state.cameraX + state.W + VISIBILITY_MARGIN;
+}
+
 // Pase "realismo": material PBR real en vez de MeshToonMaterial+gradientMap.
 // roughness/metalness reales por tipo de superficie -- ver comentarios en MAT.
 function pbr(color, extra){ return new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0, ...extra }); }
@@ -684,6 +694,8 @@ export function update(){
   for (const en of state.enemies){
     const rec = goblinPool.get(en);
     const drawX = en.drawX !== undefined ? en.drawX : en.x;
+    rec.root.visible = isNearCamera(drawX);
+    if (!rec.root.visible) continue;
     rec.root.position.copy(worldToScene(drawX, en.y));
     rec.root.rotation.z = Math.sin(t * 0.9 + (en.phase || 0)) * 0.18; // banqueo de vuelo
     rec.board.rotation.x = Math.sin(t * 1.3 + (en.phase || 0)) * 0.08;
@@ -696,6 +708,8 @@ export function update(){
 
   for (const c of state.climbers){
     const rec = climberPool.get(c);
+    rec.root.visible = isNearCamera(c.x);
+    if (!rec.root.visible) continue;
     rec.root.position.copy(worldToScene(c.x, c.y));
     const phase = c.phase || 0;
     const wobTR = Math.sin(t * 4 + phase) * 0.5;
@@ -711,6 +725,8 @@ export function update(){
 
   for (const r of state.rhinos){
     const rec = rhinoPool.get(r);
+    rec.root.visible = isNearCamera(r.x);
+    if (!rec.root.visible) continue;
     rec.root.position.copy(worldToScene(r.x, state.groundY - 20));
     // trote diagonal: FR+BL en fase, FL+BR en contrafase (marcha real de
     // cuadrúpedo en vez de las 2 patas "en espejo" de la Fase 1).
@@ -724,6 +740,8 @@ export function update(){
 
   for (const s of state.sandHands){
     const rec = sandPool.get(s);
+    rec.root.visible = isNearCamera(s.x);
+    if (!rec.root.visible) continue;
     // `root` queda fijo a nivel de piso; sólo `handGroup` se traslada/escala
     // según cuánto emergió la mano (misma fórmula que la Fase 1, aplicada al
     // hijo en vez de al root -> ver comentario arriba de makeSandHand).
@@ -761,6 +779,8 @@ export function update(){
 
   for (const s of state.scorpions){
     const rec = scorpionPool.get(s);
+    rec.root.visible = isNearCamera(s.x);
+    if (!rec.root.visible) continue;
     rec.root.position.copy(worldToScene(s.x, s.y));
     const chargeUp = s.cooldown !== undefined && s.baseCooldown ? Math.max(0, 1 - s.cooldown / 30) : 0;
     rec.stinger.scale.setScalar(1 + chargeUp * 0.35);
@@ -770,6 +790,8 @@ export function update(){
 
   for (const h of state.helicopters){
     const rec = heliPool.get(h);
+    rec.root.visible = isNearCamera(h.x);
+    if (!rec.root.visible) continue;
     rec.root.position.copy(worldToScene(h.x, h.y));
     rec.root.rotation.z = h.state === 'leaving' ? -0.25 : 0;
     rec.rotor.rotation.y += 1.1; // giro rápido; visto de costado, foreshortening natural
