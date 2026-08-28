@@ -22,7 +22,23 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(node --input-type=module -e \"console.log\\('ok'\\)\")",
-      "PowerShell(node --check \"C:\\\\Users\\\\usuario\\\\Desktop\\\\SPIDERMAN - code\\\\src\\\\enemies3d.js\")"
+      "PowerShell(node --check \"C:\\\\Users\\\\usuario\\\\Desktop\\\\SPIDERMAN - code\\\\src\\\\enemies3d.js\")",
+      "Bash(curl -sI \"https://kenney.nl/media/pages/assets/car-kit/1a312ec241-1775131960/kenney_car-kit.zip\")",
+      "Bash(curl -sI \"https://kenney.nl/media/pages/assets/mini-characters/bfc7e272b4-1774770718/kenney_mini-characters.zip\")",
+      "Bash(mkdir -p vendor/kenney/car-kit vendor/kenney/mini-characters)",
+      "Bash(curl -sf \"https://kenney.nl/media/pages/assets/car-kit/1a312ec241-1775131960/kenney_car-kit.zip\" -o vendor/kenney/car-kit.zip)",
+      "Bash(curl -sf \"https://kenney.nl/media/pages/assets/mini-characters/bfc7e272b4-1774770718/kenney_mini-characters.zip\" -o vendor/kenney/mini-characters.zip)",
+      "Bash(unzip -q -o car-kit.zip -d car-kit)",
+      "Bash(unzip -q -o mini-characters.zip -d mini-characters)",
+      "Bash(mkdir -p vendor/three/examples/jsm/loaders vendor/three/examples/jsm/utils)",
+      "Bash(curl -sf \"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/loaders/GLTFLoader.js\" -o vendor/three/examples/jsm/loaders/GLTFLoader.js)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(curl -sf \"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/utils/BufferGeometryUtils.js\" -o vendor/three/examples/jsm/utils/BufferGeometryUtils.js)",
+      "Bash(curl -sf \"https://kenney.nl/media/pages/assets/car-kit/1a312ec241-1775131960/kenney_car-kit.zip\" -o /tmp_car.zip)",
+      "Bash(curl -sf \"https://kenney.nl/media/pages/assets/mini-characters/bfc7e272b4-1774770718/kenney_mini-characters.zip\" -o /tmp_char.zip)",
+      "Bash(mkdir -p car-kit/Textures mini-characters/Textures)",
+      "Bash(unzip -p /tmp_car.zip \"Models/GLB format/Textures/colormap.png\")",
+      "Bash(unzip -p /tmp_char.zip \"Models/GLB format/Textures/colormap.png\")"
     ]
   }
 }

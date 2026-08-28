@@ -10,6 +10,7 @@
 // ============================================================================
 
 import * as THREE from '../vendor/three/build/three.module.js';
+import { GLTFLoader } from '../vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import { cityGroup, scene, worldToScene, camera, FOV_Y_RAD, camDistanceForHeight, qualityTier } from './world3d.js';
 import { getSkyState } from './skystate.js';
 import * as state from './state.js';
@@ -489,121 +490,100 @@ for (let i = 0; i < SKYLINE_COUNT; i++){
 }
 
 // ---------------------------------------------------------------------------
-// calle con vida: autos y peatones de fondo. 100% decorativo — nada de esto
-// colisiona con el jugador ni participa de ninguna mecánica, solo se
-// reposiciona en el update() de este módulo. Pool fijo reciclado (se
-// resetean al salir del rango de la cámara, igual criterio que el skyline en
-// paralaje) y todo vía InstancedMesh: 10 autos + 16 peatones terminan siendo
-// un puñado de draw calls en vez de uno por pieza, para no golpear el
-// framerate en mobile.
+// calle con vida: autos y peatones REALES (modelos glTF de Kenney.nl, CC0,
+// vendorizados en vendor/kenney/) en vez de geometría procedural — la
+// geometría hecha a mano (cajas/cápsulas) nunca llegaba a verse bien sin
+// importar cuánto se ajustaran los materiales; esto lo resuelve de raíz.
+// 100% decorativo: nada de esto colisiona con el jugador ni participa de
+// ninguna mecánica, solo se reposiciona en el update() de este módulo.
+//
+// Como cada modelo trae varias piezas/materiales propios (no una única
+// geometría uniforme), ya NO entran en el patrón de InstancedMesh de antes
+// (que asumía una sola geometría/material compartido por pieza). Cada
+// instancia en pantalla es un `.clone()` real de la escena cargada — barato:
+// Object3D.clone() sigue compartiendo la MISMA geometría/material entre
+// todas las instancias, solo duplica la jerarquía de transform (unas pocas
+// mallas por auto/persona × ~10-16 instancias, bien lejos de los ~330
+// objetos que ya maneja el resto de la escena sin problema).
 // ---------------------------------------------------------------------------
+// usado por los árboles más abajo (InstancedMesh, sin tocar en este pase).
 const _dummy = new THREE.Object3D();
-const _offsetMat = new THREE.Matrix4();
-const _composedMat = new THREE.Matrix4();
 
-// tier low: menos instancias == menos matrices que recalcular por frame en
-// updateCars/updatePeds (CPU) y menos overdraw de carrocería/cuerpos en
-// pantalla a la vez (fill-rate) — el InstancedMesh ya mantiene el draw call
-// en 1 por pieza sea cual sea el conteo, así que esto no ahorra draw calls,
-// ahorra CPU y overdraw.
+const gltfLoader = new GLTFLoader();
+function loadModel(url){
+  return new Promise((resolve, reject) => gltfLoader.load(url, gltf => resolve(gltf.scene), undefined, reject));
+}
+
+// tier low: menos instancias vivas a la vez — menos clones para reposicionar
+// por frame (CPU) y menos overdraw en pantalla, mismo criterio que el resto
+// del archivo (ya no ahorra "draw calls por instancia" como el InstancedMesh
+// viejo, pero cada auto/persona sigue siendo un puñado fijo de mallas).
 const CAR_COUNT = isLowTier ? 6 : 10;
-const CAR_COLORS = [0xc0392b, 0x2980b9, 0xf1c40f, 0x8d99a3, 0x27ae60, 0x8e44ad, 0xe67e22, 0xecf0f1];
-// geometrías con el offset local ya "horneado" (translate/rotate en la propia
-// geometría) así todas las piezas de un auto comparten la misma matriz de
-// instancia por índice — sin eso, InstancedMesh no tiene jerarquía padre/hijo.
-const carBodyGeo = new THREE.BoxGeometry(16, 6, 8).translate(0, 6, 0);
-const carCabinGeo = new THREE.BoxGeometry(8, 4, 7).translate(-1.5, 11, 0);
-const carWheelBaseGeo = new THREE.CylinderGeometry(2, 2, 1.4, 8).rotateX(Math.PI / 2);
-const CAR_WHEEL_SLOTS = [[-5.5, 2, 4.3], [5.5, 2, 4.3], [-5.5, 2, -4.3], [5.5, 2, -4.3]];
-const carWheelGeos = CAR_WHEEL_SLOTS.map(([ox, oy, oz]) => carWheelBaseGeo.clone().translate(ox, oy, oz));
-const carLightGeo = new THREE.SphereGeometry(0.75, 6, 6);
+const PED_COUNT = isLowTier ? 10 : 16;
 
-// pintura de carrocería plana y saturada tipo juguete: MeshStandardMaterial
-// simple, sin clearcoat ni base metalizada realista. El color por auto se
-// sigue aplicando por instancia vía setColorAt más abajo, sin cambiar ese
-// mecanismo.
-const carBodyMat = new THREE.MeshStandardMaterial({
-  color: 0xffffff, roughness: 0.75, metalness: 0.1,
+// tamaño real de estos modelos (metros-ish, convención Kenney) contra un
+// héroe de ~50 unidades de alto: sedan mide ~1.3 de alto crudo -> escala para
+// llevarlo a ~45 (auto real, apenas más bajo que el héroe, bastante más
+// largo). Los personajes "Mini" son low-poly estilo chibi (achaparrados,
+// ~0.67 de alto x 0.77 de ancho) — se escalan a ~38 (un poco más bajos que el
+// héroe, para que lean como gente de fondo, no como el protagonista).
+const CAR_MODEL_SCALE = 35;
+const PED_MODEL_SCALE = 55;
+// el frente de estos modelos mira +Z en su espacio local (confirmado: Z es
+// la dimensión más grande del auto, el eje largo) — nuestro mundo avanza en
+// X, así que hay que rotar 90° además de espejar según la dirección.
+const FORWARD_OFFSET = Math.PI / 2;
+
+const CAR_MODEL_FILES = ['sedan', 'taxi', 'police', 'hatchback-sports', 'van', 'suv-luxury'];
+const PED_MODEL_FILES = ['character-male-a', 'character-male-b', 'character-male-c', 'character-female-a', 'character-female-b', 'character-female-c'];
+
+let carTemplates = null, pedTemplates = null;
+const modelsReady = Promise.all([
+  Promise.all(CAR_MODEL_FILES.map(f => loadModel(`/vendor/kenney/car-kit/${f}.glb`))),
+  Promise.all(PED_MODEL_FILES.map(f => loadModel(`/vendor/kenney/mini-characters/${f}.glb`))),
+]).then(([carsLoaded, pedsLoaded]) => {
+  carTemplates = carsLoaded;
+  pedTemplates = pedsLoaded;
+}).catch(err => {
+  // si por lo que sea el modelo no carga (ej. deploy sin la carpeta vendor/kenney
+  // subida), la calle se queda sin autos/gente en vez de romper el resto del
+  // juego — mejor degradar que crashear.
+  console.error('No se pudieron cargar los modelos de Kenney (autos/gente):', err);
 });
-// vidrio de cabina: color plano saturado con un poco de emissive para que
-// "lea" como vidrio sin depender de reflejos realistas — sin clearcoat ni
-// transparencia física.
-const carCabinMat = new THREE.MeshStandardMaterial({
-  color: '#123a6e', roughness: 0.3, metalness: 0.15,
-  emissive: '#0a1f3f', emissiveIntensity: 0.25,
-  transparent: true, opacity: 0.75,
-});
-// goma de neumático: color plano mate, sin ruido de bumpMap.
-const carWheelMat = new THREE.MeshStandardMaterial({ color: '#111114', roughness: 0.95 });
-const carHeadlightMat = new THREE.MeshBasicMaterial({ color: '#fff6c8', toneMapped: false, transparent: true, opacity: 0 });
-const carTaillightMat = new THREE.MeshBasicMaterial({ color: '#ff3b30', toneMapped: false, transparent: true, opacity: 0 });
-// halo de luz: esfera más grande y muy transparente detrás de cada foco, para
-// que de noche los faros/luces traseras lean como fuentes de luz encendidas
-// (bloom "falso") y no como un punto de color plano sin brillo alrededor.
-const carLightHaloGeo = new THREE.SphereGeometry(1.8, 6, 6);
-const carHeadlightHaloMat = new THREE.MeshBasicMaterial({ color: '#fff6c8', toneMapped: false, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
-const carTaillightHaloMat = new THREE.MeshBasicMaterial({ color: '#ff3b30', toneMapped: false, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
 
-const carBodyMesh = new THREE.InstancedMesh(carBodyGeo, carBodyMat, CAR_COUNT);
-const carCabinMesh = new THREE.InstancedMesh(carCabinGeo, carCabinMat, CAR_COUNT);
-const carWheelMeshes = carWheelGeos.map(g => new THREE.InstancedMesh(g, carWheelMat, CAR_COUNT));
-const carHeadlightMesh = new THREE.InstancedMesh(carLightGeo, carHeadlightMat, CAR_COUNT);
-const carTaillightMesh = new THREE.InstancedMesh(carLightGeo, carTaillightMat, CAR_COUNT);
-const carHeadlightHaloMesh = new THREE.InstancedMesh(carLightHaloGeo, carHeadlightHaloMat, CAR_COUNT);
-const carTaillightHaloMesh = new THREE.InstancedMesh(carLightHaloGeo, carTaillightHaloMat, CAR_COUNT);
-const carMeshes = [carBodyMesh, carCabinMesh, ...carWheelMeshes, carHeadlightMesh, carTaillightMesh, carHeadlightHaloMesh, carTaillightHaloMesh];
-for (const m of carMeshes){ m.frustumCulled = false; cityGroup.add(m); }
+function makeCarInstance(i){
+  const tpl = carTemplates[i % carTemplates.length];
+  const inst = tpl.clone();
+  inst.scale.setScalar(CAR_MODEL_SCALE);
+  cityGroup.add(inst);
+  return inst;
+}
+function makePedInstance(i){
+  const tpl = pedTemplates[i % pedTemplates.length];
+  const inst = tpl.clone();
+  inst.scale.setScalar(PED_MODEL_SCALE);
+  cityGroup.add(inst);
+  return inst;
+}
 
-// escala real: el auto medía 16x6x8 unidades de geometría cruda contra un
-// héroe de ~50 de alto — un auto real tiene que superar al héroe en largo y
-// acercársele en altura, no ser una fracción de su tamaño (bug de escala real,
-// no solo estético). CAR_SCALE lleva el auto a ~120 de largo x ~45 de alto.
-const CAR_SCALE = 7.5;
 const cars = [];
 for (let i = 0; i < CAR_COUNT; i++){
   const dir = i % 2 === 0 ? 1 : -1;
   cars.push({
     x: (i - CAR_COUNT / 2) * 420 + ((i * 53) % 200),
     // z positivo: por DELANTE del frente de los edificios (z=0), nunca detrás
-    // — antes (z negativo) cualquier auto que cruzara por delante de un
-    // edificio quedaba tapado por su fachada.
+    // — en z negativo cualquier auto que cruzara por delante de un edificio
+    // quedaba tapado por su fachada.
     z: 10 + (i % 3) * 16,
     dir,
     speed: (1.6 + (i % 4) * 0.55) * dir,
+    mesh: null,
   });
-  carBodyMesh.setColorAt(i, new THREE.Color(CAR_COLORS[i % CAR_COLORS.length]));
 }
-if (carBodyMesh.instanceColor) carBodyMesh.instanceColor.needsUpdate = true;
 
-// tier low: mismo criterio que CAR_COUNT arriba.
-const PED_COUNT = isLowTier ? 10 : 16;
-// ropa (cuerpo) y piel (cabeza) en dos paletas separadas, planas y bien
-// saturadas ("de juguete") en vez de los tonos apagados/realistas de la
-// ronda anterior — así cada peatón lee como "una persona con ropa" y no como
-// una figura monocromática, sin depender de textura de tela para el detalle.
-const PED_CLOTH_TONES = [0x7a3fa0, 0x2a4fc0, 0x9a2a2a, 0x1f8a4a, 0x9a3f7a, 0x8a9a1f, 0xd9601a, 0x1f8a9a];
-const PED_SKIN_TONES = [0xe0955c, 0xf0c090, 0xa0603c, 0x7a4a28, 0xffe0b0, 0xb87848];
-const pedBodyGeo = new THREE.CapsuleGeometry(1.5, 5, 4, 8).translate(0, 4, 0);
-const pedHeadGeo = new THREE.SphereGeometry(1.5, 8, 8).translate(0, 9.5, 0);
-// ropa: color plano, sin textura de tela — roughness alto y parejo para que
-// no lea ningún especular sutil, look cartoon chato.
-const pedBodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92 });
-// piel: mate pareja, sin variación de brillo intermedia.
-const pedHeadMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
-const pedBodyMesh = new THREE.InstancedMesh(pedBodyGeo, pedBodyMat, PED_COUNT);
-const pedHeadMesh = new THREE.InstancedMesh(pedHeadGeo, pedHeadMat, PED_COUNT);
-pedBodyMesh.frustumCulled = false; pedHeadMesh.frustumCulled = false;
-cityGroup.add(pedBodyMesh, pedHeadMesh);
-
-// escala real: la figura medía ~11 de alto (cuerpo+cabeza) contra un héroe de
-// ~50 — una persona tiene que quedar comparable en altura al héroe, no una
-// fracción suya (mismo bug de escala que los autos).
-const PED_SCALE = 4.2;
 const peds = [];
 for (let i = 0; i < PED_COUNT; i++){
   const dir = i % 2 === 0 ? 1 : -1;
-  const clothTone = new THREE.Color(PED_CLOTH_TONES[i % PED_CLOTH_TONES.length]);
-  const skinTone = new THREE.Color(PED_SKIN_TONES[(i * 3 + 1) % PED_SKIN_TONES.length]);
   peds.push({
     x: (i - PED_COUNT / 2) * 220 + ((i * 37) % 140),
     // z positivo: vereda por delante del frente de los edificios (mismo
@@ -612,12 +592,9 @@ for (let i = 0; i < PED_COUNT; i++){
     dir,
     speed: (0.32 + (i % 3) * 0.14) * dir,
     phase: i * 1.7,
+    mesh: null,
   });
-  pedBodyMesh.setColorAt(i, clothTone);
-  pedHeadMesh.setColorAt(i, skinTone);
 }
-if (pedBodyMesh.instanceColor) pedBodyMesh.instanceColor.needsUpdate = true;
-if (pedHeadMesh.instanceColor) pedHeadMesh.instanceColor.needsUpdate = true;
 
 // ---------------------------------------------------------------------------
 // árboles de calle: puro relleno de color/vida al nivel de la vereda (pide la
@@ -706,66 +683,43 @@ function updateTrees(){
 }
 
 function updateCars(sky){
-  const MARGIN = 400, RESPAWN_SPAN = 1600; // agrandado junto con el nuevo espaciado (420) y escala (CAR_SCALE)
-  carHeadlightMat.opacity = sky.isNight ? 0.9 : 0;
-  carTaillightMat.opacity = sky.isNight ? 0.85 : 0;
-  carHeadlightHaloMat.opacity = sky.isNight ? 0.35 : 0;
-  carTaillightHaloMat.opacity = sky.isNight ? 0.3 : 0;
+  if (!carTemplates) return; // modelos todavía cargando (o no disponibles) — sin autos por ahora, no crashea
+  const MARGIN = 400, RESPAWN_SPAN = 1600;
   for (let i = 0; i < cars.length; i++){
     const c = cars[i];
+    if (!c.mesh) c.mesh = makeCarInstance(i);
     c.x += c.speed;
     if (c.dir > 0 && c.x > state.cameraX + state.W + MARGIN){
       c.x = state.cameraX - RESPAWN_SPAN - Math.random() * 300;
     } else if (c.dir < 0 && c.x < state.cameraX - RESPAWN_SPAN){
       c.x = state.cameraX + state.W + MARGIN + Math.random() * 300;
     }
-    // el origen local del modelo ya está a nivel de rueda (ver comentario más
-    // arriba) — anclar a groundY exacto, NO groundY+18: ese offset (pensado
-    // para la línea de carril, dibujada aparte en el canvas 2D original) acá
-    // hundía el auto entero dentro del bloque sólido de la calle en 3D.
+    // el origen local del modelo ya está a nivel de rueda — anclar a groundY
+    // exacto, NO groundY+18 (ese offset era para la línea de carril del canvas
+    // 2D original; acá hundía el auto entero dentro del bloque de la calle).
     const scenePos = worldToScene(c.x, state.groundY, c.z);
-    _dummy.position.copy(scenePos);
-    _dummy.rotation.set(0, c.dir > 0 ? 0 : Math.PI, 0);
-    _dummy.scale.set(CAR_SCALE, CAR_SCALE, CAR_SCALE);
-    _dummy.updateMatrix();
-    carBodyMesh.setMatrixAt(i, _dummy.matrix);
-    carCabinMesh.setMatrixAt(i, _dummy.matrix);
-    for (const wm of carWheelMeshes) wm.setMatrixAt(i, _dummy.matrix);
-
-    _offsetMat.makeTranslation(9, 5, 0);
-    _composedMat.multiplyMatrices(_dummy.matrix, _offsetMat);
-    carHeadlightMesh.setMatrixAt(i, _composedMat);
-    carHeadlightHaloMesh.setMatrixAt(i, _composedMat);
-    _offsetMat.makeTranslation(-9, 5, 0);
-    _composedMat.multiplyMatrices(_dummy.matrix, _offsetMat);
-    carTaillightMesh.setMatrixAt(i, _composedMat);
-    carTaillightHaloMesh.setMatrixAt(i, _composedMat);
+    c.mesh.position.copy(scenePos);
+    c.mesh.rotation.set(0, (c.dir > 0 ? 0 : Math.PI) + FORWARD_OFFSET, 0);
   }
-  for (const m of carMeshes) m.instanceMatrix.needsUpdate = true;
 }
 
 function updatePeds(tsec){
-  const MARGIN = 300, RESPAWN_SPAN = 1100; // agrandado junto con el nuevo espaciado (220) y PED_SCALE
+  if (!pedTemplates) return; // modelos todavía cargando (o no disponibles)
+  const MARGIN = 300, RESPAWN_SPAN = 1100;
   for (let i = 0; i < peds.length; i++){
     const p = peds[i];
+    if (!p.mesh) p.mesh = makePedInstance(i);
     p.x += p.speed;
     if (p.dir > 0 && p.x > state.cameraX + state.W + MARGIN){
       p.x = state.cameraX - RESPAWN_SPAN - Math.random() * 250;
     } else if (p.dir < 0 && p.x < state.cameraX - RESPAWN_SPAN){
       p.x = state.cameraX + state.W + MARGIN + Math.random() * 250;
     }
-    const bob = Math.sin(tsec * 3.2 + p.phase) * 0.5 * PED_SCALE;
-    // mismo criterio que los autos: origen local a nivel de pie, anclar a groundY.
+    const bob = Math.sin(tsec * 3.2 + p.phase) * 0.5 * (PED_MODEL_SCALE / 12);
     const scenePos = worldToScene(p.x, state.groundY, p.z);
-    _dummy.position.set(scenePos.x, scenePos.y + bob, scenePos.z);
-    _dummy.rotation.set(0, p.dir > 0 ? 0 : Math.PI, 0);
-    _dummy.scale.set(PED_SCALE, PED_SCALE, PED_SCALE);
-    _dummy.updateMatrix();
-    pedBodyMesh.setMatrixAt(i, _dummy.matrix);
-    pedHeadMesh.setMatrixAt(i, _dummy.matrix);
+    p.mesh.position.set(scenePos.x, scenePos.y + bob, scenePos.z);
+    p.mesh.rotation.set(0, (p.dir > 0 ? 0 : Math.PI) + FORWARD_OFFSET, 0);
   }
-  pedBodyMesh.instanceMatrix.needsUpdate = true;
-  pedHeadMesh.instanceMatrix.needsUpdate = true;
 }
 
 // margen fuera de los bordes visibles donde igual se sigue dibujando un
