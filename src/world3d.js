@@ -36,10 +36,23 @@ function detectQualityTier(){
   return cores >= 8 ? 'high' : 'mid';
 }
 export const qualityTier = detectQualityTier();
+// La escena real tiene ~330 mallas separadas (~17k triángulos, sin contar
+// instanced meshes) — con sombras en tiempo real activadas eso significa una
+// SEGUNDA pasada de render por cada una de esas ~330 mallas (el mapa de
+// sombras), casi duplicando el trabajo por frame. El tier "high" las tenía
+// activadas basándose solo en `hardwareConcurrency` (núcleos de CPU), que no
+// dice nada de la GPU real — muchas PCs de escritorio/notebook con 8+ núcleos
+// tienen GPU integrada modesta, y terminaban con la config más pesada sin
+// poder sostenerla (reporte real: "todo trabado" en Chrome de escritorio).
+// Hasta tener una forma confiable de medir la GPU real, sombras quedan
+// apagadas en TODOS los tiers — se prioriza que ande fluido en cualquier
+// Chrome/Safari por sobre el detalle de sombra proyectada. `pixelRatio` y
+// `bloomRes` también bajan un escalón en mid/high por el mismo motivo
+// (ambos escalan el costo de TODAS las pasadas, no solo sombras).
 export const TIER = {
-  low:  { pixelRatio: 1.25, bloom: true,  bloomRes: 0.5, shadows: false, particleScale: 0.4 },
-  mid:  { pixelRatio: Math.min(devicePixelRatio || 1, 2), bloom: true, bloomRes: 0.75, shadows: false, particleScale: 0.75 },
-  high: { pixelRatio: Math.min(devicePixelRatio || 1, 2), bloom: true, bloomRes: 1.0, shadows: true, particleScale: 1 },
+  low:  { pixelRatio: 1,                                  bloom: true, bloomRes: 0.4,  shadows: false, particleScale: 0.4 },
+  mid:  { pixelRatio: Math.min(devicePixelRatio || 1, 1.5), bloom: true, bloomRes: 0.6,  shadows: false, particleScale: 0.75 },
+  high: { pixelRatio: Math.min(devicePixelRatio || 1, 1.75), bloom: true, bloomRes: 0.85, shadows: false, particleScale: 1 },
 }[qualityTier];
 
 // ---------- chequeo de soporte antes de crear el renderer ----------

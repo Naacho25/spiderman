@@ -17,7 +17,10 @@
       "Bash(node --check src/world3d.js)",
       "Bash(node --check src/main.js)",
       "PowerShell(Get-Command node -ErrorAction SilentlyContinue)",
-      "PowerShell(Get-Command npx -ErrorAction SilentlyContinue)"
+      "PowerShell(Get-Command npx -ErrorAction SilentlyContinue)",
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }
