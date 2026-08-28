@@ -51,24 +51,9 @@ function windowTexture(seed, bgColor){
   ctx.fillStyle = bgColor || '#0e0a16';
   ctx.fillRect(0, 0, SIZE, SIZE);
 
-  // suciedad/manchado de fachada: manchurrones sutiles de humedad/hollín
-  // ANTES de dibujar las ventanas, para que la piedra entre vidrios no quede
-  // perfectamente pareja — edificios reales tienen chorreaduras y diferencias
-  // de tono aun sin ser un edificio "viejo".
-  const grimeRng = makeRng(seed + 4001);
-  const grimeCount = isLowTier ? 3 : 7;
-  for (let i = 0; i < grimeCount; i++){
-    const gx = grimeRng() * SIZE, gy = grimeRng() * SIZE;
-    const gr = SIZE * (0.1 + grimeRng() * 0.24);
-    const dark = grimeRng() > 0.45;
-    const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
-    grad.addColorStop(0, dark ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.06)');
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
-  }
-
-  // pilastra vertical sutil, para romper la fachada lisa
+  // pilastra vertical simple, para romper la fachada lisa (silueta plana, sin
+  // manchurrones de suciedad/humedad — eso era detalle "realista sutil", va en
+  // contra del look cartoon plano).
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
   ctx.fillRect(SIZE * 0.47, 0, SIZE * 0.06, SIZE);
 
@@ -82,32 +67,22 @@ function windowTexture(seed, bgColor){
       const wx = col * cw + cw * 0.18, wy = r * ch + ch * 0.18;
       const ww = cw * 0.64, wh = ch * 0.64;
 
-      // marco: rectángulo un poco más grande y más oscuro DETRÁS del vidrio,
-      // para simular el relieve/sombra del marco en vez de un vidrio
-      // flotando directo sobre la fachada.
+      // marco: rectángulo un poco más grande y más oscuro DETRÁS del vidrio —
+      // silueta plana simple, sin intento de relieve/sombra realista.
       const frameM = Math.min(ww, wh) * 0.14;
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.fillRect(wx - frameM, wy - frameM, ww + frameM * 2, wh + frameM * 2);
 
       if (isLit){
-        // contraste más amplio ventana a ventana: no todas al mismo brillo
-        // "on" — algunas apenas tenues, otras casi al máximo.
-        const bright = 0.4 + rng() * 0.6;
-        ctx.fillStyle = `rgba(255,242,194,${bright.toFixed(2)})`;
+        // "prendida": un solo tono saturado y parejo — nada de gama de
+        // brillos intermedios entre ventana y ventana, tiene que leerse
+        // claramente ON.
+        ctx.fillStyle = 'rgba(255,221,70,0.95)';
         ctx.fillRect(wx, wy, ww, wh);
       } else {
-        // "apagada": casi negra, con variación sutil de tono para que la
-        // fachada no quede como un bloque perfectamente liso de día
-        const bright = 0.04 + rng() * 0.10;
-        ctx.fillStyle = `rgba(130,140,170,${bright.toFixed(2)})`;
-        ctx.fillRect(wx, wy, ww, wh);
-        // reflejo de cielo: gradiente vertical tenue (más claro/frío arriba,
-        // se apaga hacia abajo) sobre el vidrio apagado, para que lea como
-        // cristal reflejando el cielo en vez de un agujero negro plano.
-        const skyGrad = ctx.createLinearGradient(0, wy, 0, wy + wh);
-        skyGrad.addColorStop(0, 'rgba(205,222,255,0.18)');
-        skyGrad.addColorStop(1, 'rgba(205,222,255,0)');
-        ctx.fillStyle = skyGrad;
+        // "apagada": un solo tono chato, sin reflejo de cielo ni variación de
+        // brillo — tiene que leerse claramente OFF.
+        ctx.fillStyle = 'rgba(45,55,95,0.85)';
         ctx.fillRect(wx, wy, ww, wh);
       }
 
@@ -128,55 +103,25 @@ function windowTexture(seed, bgColor){
   return tex;
 }
 
-// ---------------------------------------------------------------------------
-// ruido en escala de grises para usar como bumpMap (mismo patrón que
-// rhinoSkinBump en enemies3d.js): rompe la superficie perfectamente lisa de
-// piedra/hormigón, corteza de árbol y goma de neumático sin geometría extra.
-// Generada UNA sola vez al cargar el módulo — nunca dentro de update().
-// ---------------------------------------------------------------------------
-function grayNoiseTexture(size, contrast){
-  const cvs = document.createElement('canvas');
-  cvs.width = cvs.height = size;
-  const ctx = cvs.getContext('2d');
-  const img = ctx.createImageData(size, size);
-  for (let i = 0; i < img.data.length; i += 4){
-    const v = Math.min(255, Math.max(0, 128 + (Math.random() - 0.5) * 255 * contrast));
-    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-    img.data[i + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-  const tex = new THREE.CanvasTexture(cvs);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  return tex;
-}
-
-// bump de piedra/hormigón para fachadas: ruido chico repetido varias veces
-// por pared, tier low usa una textura más chica (menos costo de subida a GPU).
-const stoneBumpTex = grayNoiseTexture(isLowTier ? 32 : 64, 0.55);
-stoneBumpTex.repeat.set(6, 6);
-
-// paleta "maqueta pulida" tipo SimCity: piedra clara, ladrillo/terracota,
-// tostados cálidos y vidrio verde-azulado/celeste saturado, en vez de una
-// única familia oscura violeta/azul. Cada tono trae su propio roughness/
-// metalness — piedra y ladrillo más mate, vidrio más brillante — para que el
-// acabado varíe junto con el color, no solo el hue.
-// roughness/metalness ajustados a comportamiento físico real por material:
-// piedra/hormigón/ladrillo son dieléctricos rugosos (roughness alto, casi sin
-// metalness) y el vidrio es liso y algo reflectivo (roughness bajo, metalness
-// medio-alto) — antes todo vivía en un rango angosto (0.2-0.55) que hacía que
-// piedra y vidrio se comportaran casi igual ante la luz. `bump: true` marca
-// los estilos "sólidos" que reciben el ruido de piedra (stoneBumpTex); el
-// vidrio se queda liso a propósito.
+// paleta "Jetpack Joyride" tipo juguete: colores planos y MUY saturados
+// (piedra clara, ladrillo/terracota, tostados cálidos y vidrio verde-azulado/
+// celeste), sin las texturas de detalle "realista" que tenía la ronda
+// anterior (ruido de piedra vía bumpMap, suciedad de fachada, reflejo de
+// cielo en el vidrio). roughness alto y parejo en las superficies mate
+// (piedra/ladrillo) para aplanar cualquier especular sutil; el vidrio se
+// queda con roughness bajo nada más para que un highlight puntual del sol lo
+// distinga de la piedra — no hay reflejos de entorno reales en este proyecto,
+// así que no vale la pena perseguir más "fotorrealismo" ahí.
 const WALL_STYLES = [
-  { color: '#e4ddc9', roughness: 0.82, metalness: 0.03, bump: true },  // piedra clara / crema
-  { color: '#c7ccd1', roughness: 0.78, metalness: 0.04, bump: true },  // gris claro piedra
-  { color: '#b5563a', roughness: 0.8, metalness: 0.02, bump: true },   // ladrillo terracota
-  { color: '#8f6a45', roughness: 0.76, metalness: 0.03, bump: true },  // marrón tostado cálido
-  { color: '#5fb8ad', roughness: 0.1, metalness: 0.6, bump: false },   // vidrio verde-azulado
-  { color: '#79c3e0', roughness: 0.08, metalness: 0.65, bump: false }, // vidrio celeste
-  { color: '#d8b98a', roughness: 0.74, metalness: 0.03, bump: true },  // tostado/crema cálido
-  { color: '#3f6e5c', roughness: 0.12, metalness: 0.55, bump: false }, // vidrio verde oscuro
-  { color: '#c4443a', roughness: 0.35, metalness: 0.2, bump: false },  // panel esmaltado rojo/naranja (raro, tipo landmark)
+  { color: '#f5dd6e', roughness: 0.9, metalness: 0.02 },  // piedra clara / crema, bien saturada
+  { color: '#5b8fd6', roughness: 0.88, metalness: 0.03 }, // "piedra" azul saturado (reemplaza el gris apagado)
+  { color: '#e0431f', roughness: 0.88, metalness: 0.02 }, // ladrillo terracota vivo
+  { color: '#d97f1e', roughness: 0.86, metalness: 0.02 }, // marrón/naranja tostado cálido
+  { color: '#1fd9c4', roughness: 0.12, metalness: 0.5 },  // vidrio verde-azulado saturado
+  { color: '#29c3f0', roughness: 0.1, metalness: 0.55 },  // vidrio celeste saturado
+  { color: '#f0b429', roughness: 0.86, metalness: 0.02 }, // tostado/crema cálido saturado
+  { color: '#0f9e6a', roughness: 0.14, metalness: 0.45 }, // vidrio verde saturado
+  { color: '#ff4423', roughness: 0.5, metalness: 0.1 },   // panel esmaltado rojo/naranja (raro, tipo landmark)
 ];
 
 function tintedWallColor(seedX){
@@ -193,24 +138,17 @@ function makeFacadeMaterial(width, height, style, seed){
   // landmarks pueden seguir pasando su propio hex sin romper la firma.
   const isStyleObj = typeof style === 'object' && style !== null;
   const baseColor = isStyleObj ? style.color : style;
-  const roughness = isStyleObj && style.roughness != null ? style.roughness : 0.4;
-  const metalness = isStyleObj && style.metalness != null ? style.metalness : 0.15;
-  // ruido de piedra/hormigón vía bumpMap: mismo criterio que rhinoSkinBump en
-  // enemies3d.js (canvas de ruido gris, reutilizado por todas las fachadas
-  // "sólidas" — no se genera una textura nueva por edificio, es la misma
-  // instancia de stoneBumpTex, solo cambia si el material la usa o no).
-  const useBump = !isStyleObj || style.bump !== false;
+  const roughness = isStyleObj && style.roughness != null ? style.roughness : 0.9;
+  const metalness = isStyleObj && style.metalness != null ? style.metalness : 0.03;
+  // sin bumpMap: la superficie queda perfectamente plana a propósito (look
+  // cartoon), y de paso es una textura menos por edificio para samplear.
   const params = {
     color: baseColor,
-    emissive: new THREE.Color('#4a3418'),
+    emissive: new THREE.Color('#6a4a1e'),
     emissiveMap: tex,
     emissiveIntensity: 0.5,
     roughness, metalness,
   };
-  if (useBump){
-    params.bumpMap = stoneBumpTex;
-    params.bumpScale = 0.6;
-  }
   return new THREE.MeshStandardMaterial(params);
 }
 
@@ -302,7 +240,7 @@ function buildGeneric(b){
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(b.width, b.height, BUILDING_DEPTH), mat);
   mesh.position.z = -BUILDING_DEPTH / 2;
   mesh.receiveShadow = true; mesh.castShadow = true;
-  const capMat = new THREE.MeshStandardMaterial({ color: '#eef0ee', roughness: 0.35, metalness: 0.2 });
+  const capMat = new THREE.MeshStandardMaterial({ color: '#f5f2e8', roughness: 0.88, metalness: 0.03 });
   const cap = new THREE.Mesh(new THREE.BoxGeometry(b.width + 4, 6, BUILDING_DEPTH + 4), capMat);
   cap.position.set(0, b.height / 2 + 3, -BUILDING_DEPTH / 2);
   group.add(mesh, cap);
@@ -321,9 +259,9 @@ function buildEmpire(b){
   // violeta apagado — tonos ligeramente distintos entre escalones para dar
   // algo de relieve, todos dentro de la misma familia "maqueta pulida".
   const stepStyles = [
-    { color: '#ecdfc3', roughness: 0.8, metalness: 0.03 },
-    { color: '#e3d5b0', roughness: 0.78, metalness: 0.03 },
-    { color: '#ddd0ab', roughness: 0.76, metalness: 0.04 },
+    { color: '#f5dd6e', roughness: 0.9, metalness: 0.02 },
+    { color: '#f0cf4a', roughness: 0.88, metalness: 0.02 },
+    { color: '#e8c02e', roughness: 0.86, metalness: 0.03 },
   ];
   const steps = [
     { w: b.width, h: b.height * 0.55, y: 0 },
@@ -367,13 +305,13 @@ function buildEmpire(b){
 function buildWtc(b){
   const group = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({
-    color: '#5fd0e8', metalness: 0.85, roughness: 0.08,
-    emissive: '#1e4a5c', emissiveIntensity: 0.3,
+    color: '#19c8f0', metalness: 0.5, roughness: 0.1,
+    emissive: '#1e6a7c', emissiveIntensity: 0.3,
   });
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(b.width, b.height, b.width), mat);
   mesh.position.set(0, 0, -b.width / 2);
   mesh.receiveShadow = true; mesh.castShadow = true;
-  const spireMat = new THREE.MeshStandardMaterial({ color: '#eef0f5', metalness: 0.88, roughness: 0.12 });
+  const spireMat = new THREE.MeshStandardMaterial({ color: '#eef0f5', metalness: 0.6, roughness: 0.25 });
   const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 2.4, b.height * 0.1, 6), spireMat);
   spire.position.set(0, b.height / 2 + (b.height * 0.1) / 2, -b.width / 2);
   group.add(mesh, spire);
@@ -386,9 +324,9 @@ function buildWtc(b){
 // ---------------------------------------------------------------------------
 function buildTimes(b){
   const group = new THREE.Group();
-  // se queda oscura (telón de fondo para que el neón lea bien de noche) pero
-  // menos plana/mate que antes, con un toque de brillo tipo vidrio de oficina.
-  const wallMat = new THREE.MeshStandardMaterial({ color: '#2a2233', roughness: 0.55, metalness: 0.15 });
+  // se queda oscura (telón de fondo para que el neón lea bien de noche),
+  // plana y mate — sin el brillo tipo vidrio de oficina de la ronda anterior.
+  const wallMat = new THREE.MeshStandardMaterial({ color: '#241c30', roughness: 0.92, metalness: 0.03 });
   const wall = new THREE.Mesh(new THREE.BoxGeometry(b.width, b.height, BUILDING_DEPTH), wallMat);
   wall.position.z = -BUILDING_DEPTH / 2;
   wall.receiveShadow = true; wall.castShadow = true;
@@ -580,29 +518,23 @@ const CAR_WHEEL_SLOTS = [[-5.5, 2, 4.3], [5.5, 2, 4.3], [-5.5, 2, -4.3], [5.5, 2
 const carWheelGeos = CAR_WHEEL_SLOTS.map(([ox, oy, oz]) => carWheelBaseGeo.clone().translate(ox, oy, oz));
 const carLightGeo = new THREE.SphereGeometry(0.75, 6, 6);
 
-// pintura de carrocería tipo "auto real": barniz brilloso (clearcoat) sobre
-// una base metalizada, en vez de un MeshStandardMaterial mate genérico —
-// MeshPhysicalMaterial.clearcoat está soportado por el three.js vendorizado
-// (ver vendor/three/build/three.module.js, propiedad `clearcoat` en
-// MeshPhysicalMaterial). El color por auto se sigue aplicando por instancia
-// vía setColorAt más abajo, sin cambiar ese mecanismo.
-const carBodyMat = new THREE.MeshPhysicalMaterial({
-  color: 0xffffff, roughness: 0.22, metalness: 0.6,
-  clearcoat: 1, clearcoatRoughness: 0.1,
+// pintura de carrocería plana y saturada tipo juguete: MeshStandardMaterial
+// simple, sin clearcoat ni base metalizada realista. El color por auto se
+// sigue aplicando por instancia vía setColorAt más abajo, sin cambiar ese
+// mecanismo.
+const carBodyMat = new THREE.MeshStandardMaterial({
+  color: 0xffffff, roughness: 0.75, metalness: 0.1,
 });
-// vidrio de cabina como material aparte, real: oscuro, semitransparente, casi
-// liso y algo reflectivo — antes era el mismo tipo de material mate que la
-// carrocería, solo con un color más oscuro (no leía como vidrio).
-const carCabinMat = new THREE.MeshPhysicalMaterial({
-  color: '#0c1420', roughness: 0.08, metalness: 0.3,
-  clearcoat: 0.6, clearcoatRoughness: 0.1,
-  transparent: true, opacity: 0.62,
+// vidrio de cabina: color plano saturado con un poco de emissive para que
+// "lea" como vidrio sin depender de reflejos realistas — sin clearcoat ni
+// transparencia física.
+const carCabinMat = new THREE.MeshStandardMaterial({
+  color: '#123a6e', roughness: 0.3, metalness: 0.15,
+  emissive: '#0a1f3f', emissiveIntensity: 0.25,
+  transparent: true, opacity: 0.75,
 });
-// goma de neumático: ruido gris como bumpMap (mismo patrón que stoneBumpTex
-// arriba) para que la llanta no lea como un cilindro de plástico liso.
-const tireBumpTex = grayNoiseTexture(isLowTier ? 24 : 48, 0.5);
-tireBumpTex.repeat.set(2, 4);
-const carWheelMat = new THREE.MeshStandardMaterial({ color: '#111114', roughness: 0.95, bumpMap: tireBumpTex, bumpScale: 0.4 });
+// goma de neumático: color plano mate, sin ruido de bumpMap.
+const carWheelMat = new THREE.MeshStandardMaterial({ color: '#111114', roughness: 0.95 });
 const carHeadlightMat = new THREE.MeshBasicMaterial({ color: '#fff6c8', toneMapped: false, transparent: true, opacity: 0 });
 const carTaillightMat = new THREE.MeshBasicMaterial({ color: '#ff3b30', toneMapped: false, transparent: true, opacity: 0 });
 // halo de luz: esfera más grande y muy transparente detrás de cada foco, para
@@ -645,22 +577,19 @@ if (carBodyMesh.instanceColor) carBodyMesh.instanceColor.needsUpdate = true;
 
 // tier low: mismo criterio que CAR_COUNT arriba.
 const PED_COUNT = isLowTier ? 10 : 16;
-// ropa (cuerpo) y piel (cabeza) ahora son dos paletas separadas en vez de un
-// único tono por persona repetido en cuerpo y cabeza — así cada peatón lee
-// como "una persona con ropa" y no como una figura monocromática.
-const PED_CLOTH_TONES = [0x3a2e34, 0x2e2a3a, 0x332a2a, 0x2a3230, 0x35303c, 0x2f2a26, 0x4a3428, 0x263248];
-const PED_SKIN_TONES = [0xc98a5c, 0xe0b088, 0x8a5a3c, 0x6b4028, 0xf0c8a0, 0xa06840];
+// ropa (cuerpo) y piel (cabeza) en dos paletas separadas, planas y bien
+// saturadas ("de juguete") en vez de los tonos apagados/realistas de la
+// ronda anterior — así cada peatón lee como "una persona con ropa" y no como
+// una figura monocromática, sin depender de textura de tela para el detalle.
+const PED_CLOTH_TONES = [0x7a3fa0, 0x2a4fc0, 0x9a2a2a, 0x1f8a4a, 0x9a3f7a, 0x8a9a1f, 0xd9601a, 0x1f8a9a];
+const PED_SKIN_TONES = [0xe0955c, 0xf0c090, 0xa0603c, 0x7a4a28, 0xffe0b0, 0xb87848];
 const pedBodyGeo = new THREE.CapsuleGeometry(1.5, 5, 4, 8).translate(0, 4, 0);
 const pedHeadGeo = new THREE.SphereGeometry(1.5, 8, 8).translate(0, 9.5, 0);
-// textura sutil de tela sobre la "ropa": ruido chico y de bajo contraste
-// (mismo patrón grayNoiseTexture que la piedra/goma) para que no lea como
-// plástico liso — usa `map` en vez de bump porque a este tamaño en pantalla
-// el relieve del bump no se nota, pero la variación de tono sí.
-const clothTex = grayNoiseTexture(isLowTier ? 16 : 32, 0.22);
-clothTex.repeat.set(2, 3);
-const pedBodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, map: clothTex });
-// piel: menos rugosa que la tela pero lejos de un plástico brillante.
-const pedHeadMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 });
+// ropa: color plano, sin textura de tela — roughness alto y parejo para que
+// no lea ningún especular sutil, look cartoon chato.
+const pedBodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92 });
+// piel: mate pareja, sin variación de brillo intermedia.
+const pedHeadMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
 const pedBodyMesh = new THREE.InstancedMesh(pedBodyGeo, pedBodyMat, PED_COUNT);
 const pedHeadMesh = new THREE.InstancedMesh(pedHeadGeo, pedHeadMat, PED_COUNT);
 pedBodyMesh.frustumCulled = false; pedHeadMesh.frustumCulled = false;
@@ -725,34 +654,15 @@ function jitterGeometry(geo, amount){
 }
 
 const treeTrunkGeo = new THREE.CylinderGeometry(0.7, 1, 1, 6);
+// jitter de geometría (silueta orgánica simple): se deja, da variedad de
+// forma sin verse como una textura realista — es la única capa de "detalle"
+// que sobrevive de la ronda anterior en los árboles.
 const treeCanopyGeo = jitterGeometry(new THREE.SphereGeometry(1, 10, 8), 0.14);
-// corteza: ruido vertical (estirado en Y) en vez del gris-marrón plano — el
-// mismo canvas de ruido de stoneBumpTex/tireBumpTex, pero repetido angosto y
-// alto para que lea como vetas de corteza, no como piedra.
-const barkBumpTex = grayNoiseTexture(isLowTier ? 24 : 48, 0.6);
-barkBumpTex.repeat.set(2, 8);
-// follaje: manchas de verde en vez de un verde uniforme, para romper la
-// lectura "esfera de plástico" incluso antes del jitter de geometría.
-const foliageTex = (() => {
-  const size = isLowTier ? 32 : 64;
-  const cvs = document.createElement('canvas');
-  cvs.width = cvs.height = size;
-  const ctx = cvs.getContext('2d');
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, size, size);
-  const blobCount = isLowTier ? 40 : 90;
-  for (let i = 0; i < blobCount; i++){
-    const shade = 0.55 + Math.random() * 0.5;
-    ctx.fillStyle = `rgba(${Math.round(180 * shade)},${Math.round(255 * shade)},${Math.round(180 * shade)},0.5)`;
-    const x = Math.random() * size, y = Math.random() * size, r = 2 + Math.random() * (size * 0.09);
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-  }
-  const tex = new THREE.CanvasTexture(cvs);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  return tex;
-})();
-const treeTrunkMat = new THREE.MeshStandardMaterial({ color: '#5b4632', roughness: 0.9, metalness: 0.02, bumpMap: barkBumpTex, bumpScale: 0.5 });
-const treeCanopyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, metalness: 0.02, map: foliageTex });
+// tronco y follaje: color plano saturado, sin bumpMap de corteza ni textura
+// de manchas de follaje — la variedad de tono entre árboles ya la da
+// TREE_CANOPY_COLORS por instancia.
+const treeTrunkMat = new THREE.MeshStandardMaterial({ color: '#6b4a28', roughness: 0.9, metalness: 0.02 });
+const treeCanopyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, metalness: 0.02 });
 const treeTrunkMesh = new THREE.InstancedMesh(treeTrunkGeo, treeTrunkMat, TREE_COUNT);
 const treeCanopyMesh = new THREE.InstancedMesh(treeCanopyGeo, treeCanopyMat, TREE_COUNT);
 treeTrunkMesh.frustumCulled = false; treeCanopyMesh.frustumCulled = false;

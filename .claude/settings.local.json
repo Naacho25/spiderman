@@ -20,7 +20,9 @@
       "PowerShell(Get-Command npx -ErrorAction SilentlyContinue)",
       "Bash(git push *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(node --input-type=module -e \"console.log\\('ok'\\)\")",
+      "PowerShell(node --check \"C:\\\\Users\\\\usuario\\\\Desktop\\\\SPIDERMAN - code\\\\src\\\\enemies3d.js\")"
     ]
   }
 }

@@ -29,8 +29,11 @@ function isNearCamera(x){
   return x > state.cameraX - VISIBILITY_MARGIN && x < state.cameraX + state.W + VISIBILITY_MARGIN;
 }
 
-// Pase "realismo": material PBR real en vez de MeshToonMaterial+gradientMap.
-// roughness/metalness reales por tipo de superficie -- ver comentarios en MAT.
+// Pase "cartoon plano" (look Jetpack Joyride): sigue siendo MeshStandardMaterial
+// (no volvemos a MeshToonMaterial) pero SIN el detalle de superficie realista
+// del pase anterior -- roughness alto y parejo en las superficies mate, sin
+// bump/roughness maps de "uso real", colores planos bien saturados. El
+// contorno tipo comic (post-proceso en world3d.js) hace el resto del trabajo.
 function pbr(color, extra){ return new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0, ...extra }); }
 function basic(color){ return new THREE.MeshBasicMaterial({ color }); }
 function glowMat(color){
@@ -39,9 +42,10 @@ function glowMat(color){
 
 // ---------------------------------------------------------------------------
 // Texturas procedurales (canvas, generadas una sola vez al cargar el módulo,
-// nunca por frame) para dar textura de superficie real en vez de color liso:
-// piel rugosa del rhino, arena granular, y la grieta de aviso del "sentido
-// arácnido" (pedido 3).
+// nunca por frame). Pase cartoon: se sacó el ruido gris de "detalle realista"
+// (piel del rhino, rayones de metal del climber) -- queda solo lo que da una
+// lectura simple de "textura granular" (arena) o hace falta para el efecto de
+// aviso del "sentido arácnido" (pedido 3), no superficie fotorrealista.
 // ---------------------------------------------------------------------------
 function makeCanvasTexture(size, draw){
   const cvs = document.createElement('canvas');
@@ -50,18 +54,6 @@ function makeCanvasTexture(size, draw){
   const tex = new THREE.CanvasTexture(cvs);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   return tex;
-}
-function grayNoiseTexture(size, contrast, base){
-  base = base === undefined ? 128 : base;
-  return makeCanvasTexture(size, (ctx, s) => {
-    const img = ctx.createImageData(s, s);
-    for (let i = 0; i < img.data.length; i += 4){
-      const v = Math.min(255, Math.max(0, base + (Math.random() - 0.5) * 255 * contrast));
-      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-      img.data[i + 3] = 255;
-    }
-    ctx.putImageData(img, 0, 0);
-  });
 }
 function speckleTexture(size, base, speckle, count){
   return makeCanvasTexture(size, (ctx, s) => {
@@ -113,70 +105,60 @@ function jitterGeometry(geo, amount){
   return geo;
 }
 
-// piel del rhino: bump (relieve) + roughness map (variación sutil de brillo)
-// generados del mismo ruido en escala de grises, más detallados en tier alto.
-const rhinoSkinBump = grayNoiseTexture(isLowTier ? 64 : 128, 0.9);
-rhinoSkinBump.repeat.set(3, 3);
-// base alta (215) y contraste bajo -> el roughness final se mantiene siempre
-// alto (piel/cuero mate) con variación leve en vez de aplanar el material.
-const rhinoSkinRough = grayNoiseTexture(isLowTier ? 64 : 128, 0.18, 215);
-rhinoSkinRough.repeat.set(3, 3);
+// arena: única textura de detalle que se mantiene -- da una lectura simple de
+// "grano" sin verse fotorrealista (colores planos, sin bump/roughness map).
 const sandGrainTex = speckleTexture(128, '#c9a56b', '#8a6a42', 900);
 const sandGrainTexDark = speckleTexture(128, '#8a6a42', '#5f4526', 700);
 const sandCrackTex = crackTexture(128);
-// metal del climber: rayones/desgaste sutil sobre las juntas y pistones (las
-// piezas "usadas"), no sobre torso/brazos principales que quedan pulidos.
-// Se salta del todo en tier bajo (textura extra sólo si el hardware la banca).
-const metalScratchRough = isLowTier ? null : grayNoiseTexture(96, 0.32, 195);
-if (metalScratchRough) metalScratchRough.repeat.set(2, 2);
 
 const MAT = {
   goblin: {
-    // tabla: fibra/resina rígida -- ni mate de tela ni brillante de metal.
-    board: pbr('#1a2b14', { roughness: 0.55, metalness: 0 }),
-    // traje/piel del cuerpo: cuero sintético con algo de sheen.
-    body: pbr('#357a2c', { roughness: 0.6, metalness: 0.05 }),
-    hood: pbr('#16240f', { roughness: 0.7, metalness: 0 }),
-    // capa: tela real -- muy rugosa, sin metal, para que no lea como plástico sólido.
-    cloak: pbr('#16240f', { roughness: 0.95, metalness: 0 }),
+    // tabla: fibra/resina rígida -- color plano bien saturado, sin sheen sutil.
+    board: pbr('#1f3a12', { roughness: 0.85, metalness: 0 }),
+    // traje/piel del cuerpo: verde vivo cartoon, sin metalness realista.
+    body: pbr('#2fb339', { roughness: 0.9, metalness: 0 }),
+    hood: pbr('#123a0a', { roughness: 0.9, metalness: 0 }),
+    // capa: tela -- mate al máximo, plana, sin metal.
+    cloak: pbr('#0e2e08', { roughness: 0.95, metalness: 0 }),
     eye: basic('#ffe066'),
     glow: glowMat('#78ff5a'),
   },
   climber: {
-    // torso/brazo superior: chasis principal pulido.
-    torso: pbr('#3a3f47', { roughness: 0.35, metalness: 0.85 }),
-    arm: pbr('#8b929c', { roughness: 0.4, metalness: 0.85 }),
-    // juntas/pistones: piezas de uso -- más rugosas, con rayones sutiles.
-    joint: pbr('#5b616a', { roughness: 0.6, metalness: 0.75, roughnessMap: metalScratchRough || null }),
-    leg: pbr('#23262b', { roughness: 0.5, metalness: 0.8 }),
+    // torso/brazo/pierna: chasis con tinte azulado saturado (no gris neutro
+    // desaturado) y metalness moderado -- plano, sin rayones de "uso real".
+    torso: pbr('#2e4a63', { roughness: 0.45, metalness: 0.55 }),
+    arm: pbr('#7fa0bd', { roughness: 0.45, metalness: 0.55 }),
+    // juntas/pistones: mismo tratamiento plano que el resto, sin roughnessMap.
+    joint: pbr('#4a6178', { roughness: 0.5, metalness: 0.5 }),
+    leg: pbr('#1e2c3a', { roughness: 0.5, metalness: 0.55 }),
     lens: basic('#ff3b3b'),
     glow: glowMat('#ff3c3c'),
   },
   rhino: {
-    // piel/cuero de animal real: sin metal, roughness alto, bump + roughness
-    // map procedurales para que no quede liso tipo plástico.
-    body: pbr('#7d7262', { roughness: 0.82, metalness: 0, bumpMap: rhinoSkinBump, bumpScale: 0.8, roughnessMap: rhinoSkinRough }),
-    plate: pbr('#5c5346', { roughness: 0.88, metalness: 0, bumpMap: rhinoSkinBump, bumpScale: 0.8, roughnessMap: rhinoSkinRough }),
-    // cuerno: queratina -- algo más lisa/pulida que la piel.
-    horn: pbr('#d9cdb0', { roughness: 0.55, metalness: 0 }),
+    // piel/cuero: color plano marrón-rojizo bien saturado, roughness parejo
+    // al máximo, SIN bump/roughness map de piel realista.
+    body: pbr('#9c5e3c', { roughness: 0.9, metalness: 0 }),
+    plate: pbr('#7a4529', { roughness: 0.92, metalness: 0 }),
+    // cuerno: queratina -- tono marfil vivo, sigue algo más liso que la piel.
+    horn: pbr('#ecdca0', { roughness: 0.6, metalness: 0 }),
     eye: basic('#231810'),
   },
   sand: {
-    // arena granular: no brilla nunca, roughness al máximo, sin metal.
-    body: pbr('#e2c896', { roughness: 0.95, metalness: 0, map: sandGrainTex }),
-    dark: pbr('#c9ac7c', { roughness: 0.95, metalness: 0, map: sandGrainTexDark }),
+    // arena granular: color plano dorado saturado, roughness al máximo, sin metal.
+    body: pbr('#eec765', { roughness: 0.95, metalness: 0, map: sandGrainTex }),
+    dark: pbr('#cf9a3f', { roughness: 0.95, metalness: 0, map: sandGrainTexDark }),
     warnGlow: new THREE.MeshBasicMaterial({ color: '#ffb347', map: sandCrackTex, transparent: true, opacity: 0, depthWrite: false }),
   },
   scorpion: {
-    // exoesqueleto/quitina: brillo característico real -- roughness medio-bajo,
-    // sin metal (no es metálico, es un brillo orgánico duro).
-    body: pbr('#1c3324', { roughness: 0.4, metalness: 0 }),
-    plate: pbr('#25422e', { roughness: 0.4, metalness: 0 }),
-    tail: pbr('#274a34', { roughness: 0.45, metalness: 0 }),
+    // exoesqueleto/quitina: verde vivo saturado, roughness medio-bajo para un
+    // brillo quitinoso simple y limpio (no fotorrealista), sin metal.
+    body: pbr('#177a3e', { roughness: 0.45, metalness: 0 }),
+    plate: pbr('#1f9a4d', { roughness: 0.45, metalness: 0 }),
+    tail: pbr('#2a8a4a', { roughness: 0.5, metalness: 0 }),
     // membranas entre segmentos: más mate que el caparazón.
-    joint: pbr('#1a2c1f', { roughness: 0.6, metalness: 0 }),
-    pincer: pbr('#2c5238', { roughness: 0.35, metalness: 0 }),
-    leg: pbr('#16281c', { roughness: 0.55, metalness: 0 }),
+    joint: pbr('#123321', { roughness: 0.65, metalness: 0 }),
+    pincer: pbr('#2fae59', { roughness: 0.4, metalness: 0 }),
+    leg: pbr('#123321', { roughness: 0.6, metalness: 0 }),
     stinger: basic('#8aff6a'),
     eye: basic('#ffe066'),
     // tier low: mismo costo de fill-rate que los glows de arriba (mesh
@@ -186,14 +168,16 @@ const MAT = {
     shine: new THREE.MeshBasicMaterial({ color: '#eafff0', transparent: true, opacity: isLowTier ? 0.16 : 0.3, depthWrite: false }),
   },
   heli: {
-    // carrocería: pintura automotriz -- roughness bajo-medio, algo de metalness.
-    body: pbr('#2b3a4a', { roughness: 0.35, metalness: 0.55 }),
-    bodyRiding: pbr('#c0272d', { roughness: 0.35, metalness: 0.55 }),
-    // cabina: vidrio -- roughness muy bajo, algo de metalness, transparencia existente.
+    // carrocería: pintura plana bien saturada, metalness moderado, sin
+    // rayones/desgaste de "uso real".
+    body: pbr('#1c6bc0', { roughness: 0.5, metalness: 0.45 }),
+    bodyRiding: pbr('#e0262d', { roughness: 0.5, metalness: 0.45 }),
+    // cabina: vidrio -- se mantiene con roughness bajo (es vidrio, no una
+    // superficie mate), transparencia existente sin tocar.
     cockpit: new THREE.MeshStandardMaterial({ color: '#b4dcff', roughness: 0.15, metalness: 0.3, transparent: true, opacity: 0.85 }),
-    rotor: pbr('#cfd6dd', { roughness: 0.45, metalness: 0.75 }),
-    // patines: metal sin pintar.
-    skid: pbr('#1a1f26', { roughness: 0.5, metalness: 0.85 }),
+    rotor: pbr('#d7dee6', { roughness: 0.5, metalness: 0.5 }),
+    // patines: metal plano oscuro, sin desgaste.
+    skid: pbr('#171d26', { roughness: 0.55, metalness: 0.5 }),
   },
 };
 

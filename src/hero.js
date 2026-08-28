@@ -7,14 +7,16 @@
 // pantorrilla, un pivot de columna (chestPivot) que separa el pecho de la
 // cadera para que el arqueo de espalda y la inclinación al colgar sean curva
 // real y no un torso rígido, cabeza que gira hacia el punto de interés.
-// Fase 4 (pase material): materiales PBR (MeshPhysicalMaterial) en vez de
-// MeshToonMaterial + gradientMap — traje tipo licra/spandex con roughness
-// medio-alto, metalness ~0 y un "sheen" sutil de tela, cinturón en cuero
-// aparte, más un normal map procedural (micro-arrugas, sin patrón) y un mapa
-// de rugosidad procedural (variación de tono/tela muy leve) para romper el
-// look plástico perfecto sin ensuciar el traje. El "rim light shell" (mesh
-// clonado hacia afuera, BackSide + AdditiveBlending) es un efecto aditivo
-// aparte y sigue intacto. La regla dura sigue intacta: el héroe SIEMPRE vive
+// Fase 5 (pase cartoon plano, look Jetpack Joyride): se abandona el PBR
+// realista de la fase anterior (MeshPhysicalMaterial, normal map de tela,
+// roughness map, sheen) a favor de MeshStandardMaterial simple — color
+// sólido por pieza del cuerpo, sin ruido de superficie, metalness 0 y
+// roughness alto y parejo (0.85-0.95) para que el sombreado no le meta
+// brillo/variación "realista". El contorno negro grueso (post-proceso en
+// world3d.js) es el que hace la lectura de "dibujo", no la superficie. El
+// "rim light shell" (mesh clonado hacia afuera, BackSide + AdditiveBlending)
+// es un efecto aditivo aparte y sigue intacto. La regla dura sigue intacta:
+// el héroe SIEMPRE vive
 // en sceneZ = 0 (group.position = worldToScene(player.x, player.y), sin
 // offset de Z) — solo el "shell" decorativo del rim light cuelga del mismo
 // origen, nunca lo desplaza.
@@ -36,128 +38,52 @@ group.add(bodyPivot);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // ---------------------------------------------------------------------------
-// ruido orgánico suavizado, base compartida para las dos texturas procedurales
-// de tela de abajo (normal map de micro-arrugas + mapa de rugosidad de
-// variación de tono). A propósito NO es una grilla ni nada regular (evita
-// cualquier lectura como red/telaraña).
+// saturación: sube un poco la saturación percibida de un color de skin sin
+// tocar state.js — usado para cinturón/acentos, que al lado de un traje muy
+// plano y vivo quedaban "apagados" si se usaba el color crudo de la skin.
 // ---------------------------------------------------------------------------
-function buildBlurredNoise(size){
-  const h = new Float32Array(size * size);
-  for (let i = 0; i < h.length; i++) h[i] = Math.random();
-  const blurred = new Float32Array(size * size);
-  for (let y = 0; y < size; y++){
-    for (let x = 0; x < size; x++){
-      let sum = 0;
-      for (let dy = -1; dy <= 1; dy++){
-        for (let dx = -1; dx <= 1; dx++){
-          sum += h[((y + dy + size) % size) * size + ((x + dx + size) % size)];
-        }
-      }
-      blurred[y * size + x] = sum / 9;
-    }
-  }
-  return blurred;
+function boostSaturation(hex, amount){
+  const c = new THREE.Color(hex);
+  const hsl = { h: 0, s: 0, l: 0 };
+  c.getHSL(hsl);
+  hsl.s = clamp(hsl.s + amount, 0, 1);
+  c.setHSL(hsl.h, hsl.s, hsl.l);
+  return c;
 }
 
-// normal map: solo micro-arrugas de tela, para que el traje deje de verse
-// plástico liso bajo el rim light y el sol. Un único DataTexture compartido
-// por todas las skins (mismo patrón sirve, se tiñe con cada color).
-function buildFabricNormalMap(size = 48){
-  const blurred = buildBlurredNoise(size);
-  const data = new Uint8Array(size * size * 4);
-  for (let y = 0; y < size; y++){
-    for (let x = 0; x < size; x++){
-      const l = blurred[y * size + ((x - 1 + size) % size)];
-      const r = blurred[y * size + ((x + 1) % size)];
-      const u = blurred[((y - 1 + size) % size) * size + x];
-      const d = blurred[((y + 1) % size) * size + x];
-      const nx = (l - r) * 1.4;
-      const ny = (u - d) * 1.4;
-      const nz = 1;
-      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-      const idx = (y * size + x) * 4;
-      data[idx]     = ((nx / len) * 0.5 + 0.5) * 255;
-      data[idx + 1] = ((ny / len) * 0.5 + 0.5) * 255;
-      data[idx + 2] = ((nz / len) * 0.5 + 0.5) * 255;
-      data[idx + 3] = 255;
-    }
-  }
-  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(4, 4);
-  tex.needsUpdate = true;
-  return tex;
-}
-const fabricNormalMap = buildFabricNormalMap();
-
-// mapa de rugosidad: variación de tono/arruga MUY leve para que el traje deje
-// de leer como plástico perfectamente uniforme, sin ir al extremo "sucio" o
-// "gastado" (rango angosto, casi todo cerca del máximo — solo motea un poco
-// más brillante en algunas zonas, nunca más rugoso que la base). Tiling
-// distinto al del normal map para que no se lean como el mismo patrón
-// superpuesto dos veces.
-function buildFabricRoughnessMap(size = 32){
-  const blurred = buildBlurredNoise(size);
-  let min = Infinity, max = -Infinity;
-  for (const v of blurred){ if (v < min) min = v; if (v > max) max = v; }
-  const range = Math.max(1e-5, max - min);
-  const data = new Uint8Array(size * size * 4);
-  for (let i = 0; i < size * size; i++){
-    const n = (blurred[i] - min) / range; // 0..1
-    const g = Math.round((0.82 + n * 0.18) * 255); // 0.82..1.0 — nunca más rugoso que la base
-    const idx = i * 4;
-    data[idx] = data[idx + 1] = data[idx + 2] = g;
-    data[idx + 3] = 255;
-  }
-  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(6, 6);
-  tex.needsUpdate = true;
-  return tex;
-}
-const fabricRoughnessMap = buildFabricRoughnessMap();
-
 // ---------------------------------------------------------------------------
-// materiales por skin — PBR realista. El traje es tela ajustada tipo
-// licra/spandex: roughness medio-alto (no brilla como plástico ni es
-// completamente mate), metalness ~0, con un "sheen" sutil (fibra sintética
-// bajo luz rasante) vía MeshPhysicalMaterial. El cinturón es cuero aparte
-// (más metalness, roughness algo menor, sin sheen de tela). Los ojos
-// emisivos (skins con eyeGlow) siguen siendo MeshBasicMaterial sin cambios —
-// ese comportamiento de "fuente de luz" no se toca acá.
+// materiales por skin — look cartoon plano (referencia: Jetpack Joyride),
+// ya no tela PBR realista. Sin normal map de micro-arrugas ni roughness map
+// de variación de tono: cada pieza del cuerpo lee como un color sólido y
+// parejo, y es el contorno negro (post-proceso en world3d.js) el que hace el
+// trabajo de "dibujo", no la superficie. roughness alto y parejo (0.85-0.95)
+// en todas las piezas para que el sombreado del sol/rim light no le meta
+// brillo ni variación de "tela real" — metalness en 0 en todo el traje. Los
+// ojos emisivos (skins con eyeGlow) siguen siendo MeshBasicMaterial sin
+// cambios — ese comportamiento de "fuente de luz" no se toca acá.
 // ---------------------------------------------------------------------------
-function suitMaterial(color, { roughness, metalness = 0.02, normalScale = 0.3, sheen = 0.25, sheenRoughness = 0.65 } = {}){
-  return new THREE.MeshPhysicalMaterial({
-    color,
-    roughness,
-    metalness,
-    normalMap: fabricNormalMap,
-    normalScale: new THREE.Vector2(normalScale, normalScale),
-    roughnessMap: fabricRoughnessMap,
-    sheen,
-    sheenRoughness,
-    sheenColor: new THREE.Color(0xffffff),
-  });
+function suitMaterial(color, { roughness, metalness = 0 } = {}){
+  return new THREE.MeshStandardMaterial({ color, roughness, metalness });
 }
 
 const materials = state.SKINS.map(s => ({
-  // traje: torso/piernas roughness ~0.6-0.65 (licra mate-satinada, no plástico).
-  torso:  suitMaterial(s.torso, { roughness: 0.60, metalness: 0.02, normalScale: 0.35, sheen: 0.25, sheenRoughness: 0.65 }),
-  legs:   suitMaterial(s.legs,  { roughness: 0.65, metalness: 0.02, normalScale: 0.35, sheen: 0.22, sheenRoughness: 0.7 }),
-  // acento (mangas/hombros/detalles): tela un poco más tensa/lisa que el torso.
-  accent: suitMaterial(s.accent, { roughness: 0.55, metalness: 0.03, normalScale: 0.28, sheen: 0.3, sheenRoughness: 0.6 }),
-  // máscara: misma familia de tela que el torso, arruga más sutil (más ceñida).
+  // traje: torso/piernas mate y sólido, sin sheen de tela ni ruido de superficie.
+  torso:  suitMaterial(s.torso, { roughness: 0.90, metalness: 0 }),
+  legs:   suitMaterial(s.legs,  { roughness: 0.92, metalness: 0 }),
+  // acento (mangas/hombros/detalles): color con saturación reforzada para que
+  // no quede apagado al lado del traje.
+  accent: suitMaterial(boostSaturation(s.accent, 0.12), { roughness: 0.88, metalness: 0 }),
+  // máscara: mismo plano de color, sin variación de arruga (más ceñida).
   mask: (() => {
-    const m = suitMaterial(s.mask, { roughness: 0.58, metalness: 0.02, normalScale: 0.18, sheen: 0.2, sheenRoughness: 0.65 });
+    const m = suitMaterial(s.mask, { roughness: 0.85, metalness: 0 });
     m.emissive = s.eyeGlow ? new THREE.Color(s.eyeColor || '#ffffff') : new THREE.Color(0x000000);
     m.emissiveIntensity = s.eyeGlow ? 0.12 : 0;
     return m;
   })(),
-  // cinturón: cuero — roughness medio, casi sin metal, sin sheen de tela ni
-  // el normal map de micro-arrugas (grano de cuero mucho más sutil).
+  // cinturón: mismo look plano/mate que el resto, sin grano de cuero ni
+  // metalness — color con saturación reforzada, igual que el acento.
   belt: new THREE.MeshStandardMaterial({
-    color: s.accent, roughness: 0.5, metalness: 0.06,
-    normalMap: fabricNormalMap, normalScale: new THREE.Vector2(0.12, 0.12),
+    color: boostSaturation(s.accent, 0.12), roughness: 0.88, metalness: 0,
   }),
   eyeGlow: s.eyeGlow ? new THREE.MeshBasicMaterial({ color: s.eyeColor || '#ffffff', toneMapped: false }) : null,
   // ojos no-emisivos: lente clara, algo brillante (no fabric, no toon).

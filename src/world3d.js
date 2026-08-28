@@ -16,6 +16,7 @@ import { EffectComposer } from '../vendor/three/examples/jsm/postprocessing/Effe
 import { RenderPass } from '../vendor/three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from '../vendor/three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../vendor/three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from '../vendor/three/examples/jsm/postprocessing/ShaderPass.js';
 import { canvas, W, H, cameraX, elapsedFrames } from './state.js';
 import { getSkyState } from './skystate.js';
 
@@ -166,10 +167,63 @@ export const toonGradientMap = (() => {
 scene.fog = new THREE.Fog(0x0a0612, 700, 4200);
 scene.background = new THREE.Color(0x0a0612);
 
-// ---------- postprocesado (bloom) ----------
+// ---------- postprocesado: contorno tipo comic + bloom ----------
+// Contorno estilo cartoon (pedido: acercar el look a Jetpack Joyride —
+// contornos negros gruesos + colores planos, dejando de lado el realismo
+// PBR). En vez de la técnica clásica "inverted hull" (dibujar cada malla DOS
+// veces — una normal, otra agrandada y solo la cara de atrás en negro), que
+// duplicaría de golpe los ~350 draw calls que recién terminamos de bajar,
+// esto es UN solo pase de postprocesado (detección de bordes tipo Sobel
+// sobre la imagen ya renderizada) — cuesta lo mismo sea cual sea la cantidad
+// de objetos en escena, coherente con toda la ronda de optimización anterior.
+// Va ANTES del bloom (no después) para que el brillo de neones/ojos siga
+// aplicándose sobre la imagen ya contorneada, no al revés.
+const OutlineShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    resolution: { value: new THREE.Vector2(1, 1) },
+    edgeStrength: { value: 1.0 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main(){
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform vec2 resolution;
+    uniform float edgeStrength;
+    varying vec2 vUv;
+    float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+    void main(){
+      vec2 texel = 1.0 / resolution;
+      float tl = luma(texture2D(tDiffuse, vUv + texel*vec2(-1.0,-1.0)).rgb);
+      float t  = luma(texture2D(tDiffuse, vUv + texel*vec2( 0.0,-1.0)).rgb);
+      float tr = luma(texture2D(tDiffuse, vUv + texel*vec2( 1.0,-1.0)).rgb);
+      float l  = luma(texture2D(tDiffuse, vUv + texel*vec2(-1.0, 0.0)).rgb);
+      float r  = luma(texture2D(tDiffuse, vUv + texel*vec2( 1.0, 0.0)).rgb);
+      float bl = luma(texture2D(tDiffuse, vUv + texel*vec2(-1.0, 1.0)).rgb);
+      float b  = luma(texture2D(tDiffuse, vUv + texel*vec2( 0.0, 1.0)).rgb);
+      float br = luma(texture2D(tDiffuse, vUv + texel*vec2( 1.0, 1.0)).rgb);
+      float gx = -tl - 2.0*l - bl + tr + 2.0*r + br;
+      float gy = -tl - 2.0*t - tr + bl + 2.0*b + br;
+      float edge = sqrt(gx*gx + gy*gy) * edgeStrength;
+      float line = smoothstep(0.06, 0.22, edge);
+      vec4 base = texture2D(tDiffuse, vUv);
+      gl_FragColor = vec4(mix(base.rgb, vec3(0.02, 0.02, 0.03), line), base.a);
+    }
+  `,
+};
+
 export const composer = new EffectComposer(renderer);
 composer.setPixelRatio(TIER.pixelRatio);
 composer.addPass(new RenderPass(scene, camera));
+export const outlinePass = new ShaderPass(OutlineShader);
+outlinePass.uniforms.resolution.value.set(W * TIER.pixelRatio, H * TIER.pixelRatio);
+outlinePass.uniforms.edgeStrength.value = 1.8;
+composer.addPass(outlinePass);
 export const bloomPass = new UnrealBloomPass(new THREE.Vector2(W * TIER.bloomRes, H * TIER.bloomRes), 0.85, 0.5, 0.72);
 composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
@@ -208,6 +262,7 @@ export function onResize(){
   renderer.domElement.style.height = H + 'px';
   composer.setSize(rw, rh);
   bloomPass.resolution.set(rw * TIER.bloomRes, rh * TIER.bloomRes);
+  outlinePass.uniforms.resolution.value.set(rw, rh);
 }
 addEventListener('resize', () => setTimeout(onResize, 0));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(onResize, 0); });
