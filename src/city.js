@@ -12,8 +12,8 @@
 import * as THREE from '../vendor/three/build/three.module.js';
 import { GLTFLoader } from '../vendor/three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from '../vendor/three/examples/jsm/utils/SkeletonUtils.js';
-import { cityGroup, scene, worldToScene, camera, FOV_Y_RAD, camDistanceForHeight, qualityTier } from './world3d.js';
-import { getSkyState } from './skystate.js';
+import { cityGroup, scene, worldToScene, camera, FOV_Y_RAD, camDistanceForHeight, qualityTier, renderer } from './world3d.js';
+import { getSkyState, lerpHexToHexString } from './skystate.js';
 import * as state from './state.js';
 
 const BUILDING_DEPTH = 60;
@@ -53,55 +53,39 @@ function windowTexture(seed, bgColor){
   ctx.fillStyle = bgColor || '#0e0a16';
   ctx.fillRect(0, 0, SIZE, SIZE);
 
-  // pilastra vertical simple, para romper la fachada lisa (silueta plana, sin
-  // manchurrones de suciedad/humedad — eso era detalle "realista sutil", va en
-  // contra del look cartoon plano).
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  ctx.fillRect(SIZE * 0.47, 0, SIZE * 0.06, SIZE);
-
+  // look "silueta plana" (referencia: primera versión 2D) — grilla prolija de
+  // cuadraditos, la gran mayoría prendidos, directo sobre la fachada (sin
+  // marco/pilastra ni siluetas de gente: eso era detalle "realista sutil" de
+  // una ronda anterior, acá se busca lo opuesto — lo más simple posible).
   const rng = makeRng(seed);
   const cols = TEX_COLS, rows = TEX_ROWS;
   const cw = SIZE / cols, ch = SIZE / rows;
   for (let r = 0; r < rows; r++){
     for (let col = 0; col < cols; col++){
       if ((r + col) % 3 === 0) continue; // hueco estructural entre ventanas
-      const isLit = rng() > 0.6;
-      const wx = col * cw + cw * 0.18, wy = r * ch + ch * 0.18;
-      const ww = cw * 0.64, wh = ch * 0.64;
+      const isLit = rng() > 0.15;
+      const wx = col * cw + cw * 0.22, wy = r * ch + ch * 0.22;
+      const ww = cw * 0.56, wh = ch * 0.56;
+      const radius = Math.min(ww, wh) * 0.18;
 
-      // marco: rectángulo un poco más grande y más oscuro DETRÁS del vidrio —
-      // silueta plana simple, sin intento de relieve/sombra realista.
-      const frameM = Math.min(ww, wh) * 0.14;
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(wx - frameM, wy - frameM, ww + frameM * 2, wh + frameM * 2);
-
-      if (isLit){
-        // "prendida": un solo tono saturado y parejo — nada de gama de
-        // brillos intermedios entre ventana y ventana, tiene que leerse
-        // claramente ON.
-        ctx.fillStyle = 'rgba(255,221,70,0.95)';
-        ctx.fillRect(wx, wy, ww, wh);
-      } else {
-        // "apagada": un solo tono chato, sin reflejo de cielo ni variación de
-        // brillo — tiene que leerse claramente OFF.
-        ctx.fillStyle = 'rgba(45,55,95,0.85)';
-        ctx.fillRect(wx, wy, ww, wh);
-      }
-
-      // "gente": silueta simple sobre algunas ventanas prendidas
-      if (isLit && rng() > 0.62){
-        ctx.fillStyle = 'rgba(8,6,10,0.8)';
-        ctx.beginPath();
-        ctx.ellipse(wx + ww * 0.5, wy + wh * 0.62, ww * 0.22, wh * 0.28, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(wx + ww * 0.5, wy + wh * 0.3, ww * 0.15, wh * 0.16, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      ctx.fillStyle = isLit
+        ? 'rgba(255,214,130,0.95)' // "prendida" — mismo tono exacto que la versión 2D original
+        : 'rgba(45,55,95,0.7)';    // "apagada": chata, sin reflejo ni variación de brillo
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(wx, wy, ww, wh, radius);
+      else ctx.rect(wx, wy, ww, wh);
+      ctx.fill();
     }
   }
   const tex = new THREE.CanvasTexture(c);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  // sin esto, la grilla de ventanas (chica, alto contraste, repetida varias
+  // veces por edificio) hace muaré/entramado diagonal apenas se la ve a
+  // distancia o de costado — es el sampleo por mip normal de Three.js sin
+  // filtrado anisotrópico, no un bug del dibujo en sí. maxAnisotropy en un
+  // edificio angosto de perfil no cuesta nada (misma textura de siempre,
+  // solo mejor filtrada) y es la corrección estándar para este artefacto.
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
   return tex;
 }
 
@@ -125,28 +109,26 @@ function loadPatternTex(name){
 const brickPatternTex = loadPatternTex('brick'); // hiladas de ladrillo prolijas
 const blockPatternTex = loadPatternTex('block'); // bloques más grandes, lee como piedra/panel
 
-// paleta "Jetpack Joyride" tipo juguete: colores planos y MUY saturados
-// (piedra clara, ladrillo/terracota, tostados cálidos y vidrio verde-azulado/
-// celeste), sin las texturas de detalle "realista" que tenía la ronda
-// anterior (ruido de piedra vía bumpMap, suciedad de fachada, reflejo de
-// cielo en el vidrio). roughness alto y parejo en las superficies mate
-// (piedra/ladrillo) para aplanar cualquier especular sutil; el vidrio se
-// queda con roughness bajo nada más para que un highlight puntual del sol lo
-// distinga de la piedra — no hay reflejos de entorno reales en este proyecto,
-// así que no vale la pena perseguir más "fotorrealismo" ahí. `pattern` marca
-// qué textura de Kenney va en el `map` (null en el vidrio: un panel de vidrio
-// real es liso, no tiene mampostería que dibujar).
-const WALL_STYLES = [
-  { color: '#f5dd6e', roughness: 0.9, metalness: 0.02, pattern: 'block' },  // piedra clara / crema, bien saturada
-  { color: '#5b8fd6', roughness: 0.88, metalness: 0.03, pattern: 'block' }, // "piedra" azul saturado (reemplaza el gris apagado)
-  { color: '#e0431f', roughness: 0.88, metalness: 0.02, pattern: 'brick' }, // ladrillo terracota vivo
-  { color: '#d97f1e', roughness: 0.86, metalness: 0.02, pattern: 'brick' }, // marrón/naranja tostado cálido
-  { color: '#1fd9c4', roughness: 0.12, metalness: 0.5, pattern: null },    // vidrio verde-azulado saturado
-  { color: '#29c3f0', roughness: 0.1, metalness: 0.55, pattern: null },    // vidrio celeste saturado
-  { color: '#f0b429', roughness: 0.86, metalness: 0.02, pattern: 'block' }, // tostado/crema cálido saturado
-  { color: '#0f9e6a', roughness: 0.14, metalness: 0.45, pattern: null },   // vidrio verde saturado
-  { color: '#ff4423', roughness: 0.5, metalness: 0.1, pattern: 'block' },  // panel esmaltado rojo/naranja (raro, tipo landmark)
-];
+// paleta "silueta plana" — vuelta al look de la primera versión 2D del juego
+// (referencia: skyline chato color sólido + grilla de ventanas prendidas,
+// atardecer violeta->naranja, sin contorno tipo cómic ni mampostería
+// texturada). Reemplaza la ronda "Jetpack Joyride" (colores de juguete +
+// ladrillo/bloque de Kenney + contorno) — ese trabajo queda intacto en el
+// código (brickPatternTex/blockPatternTex, pattern en cada estilo, el
+// contorno en world3d.js) por si se vuelve a pedir ese look; acá simplemente
+// no se usa: `pattern: null` en todo y solo 2 tonos, mayoría del color
+// oscuro tipo "noche" (índigo) con un acento cálido (marrón/terracota) de
+// vez en cuando, igual que el skyline de referencia. roughness/metalness ya
+// casi no inciden en el resultado visual (la fachada es una sola cara plana
+// de frente a cámara, sin variación de sombreado dentro de la cara).
+// un solo color, '#241a33' — el mismo hex exacto que usaba drawGenericBuilding()
+// en la versión 2D original (index-2d-legacy-backup.html, commit 9a2c4ab): ahí
+// NUNCA hubo variedad de color entre edificios, todos el mismo índigo oscuro.
+// Lo que en la referencia se ve como bloques marrones de fondo NO es un
+// edificio con otro color: es la silueta lejana en paralaje (más abajo en este
+// archivo), semitransparente sobre el naranja del horizonte — eso es lo que
+// hay que replicar ahí, no acá.
+const WALL_STYLES = [{ color: '#241a33', roughness: 0.95, metalness: 0, pattern: null }];
 
 function tintedWallColor(seedX){
   const r = makeRng(Math.floor(seedX * 7));
@@ -269,7 +251,11 @@ function addRoofProps(group, b){
 }
 
 // ---------------------------------------------------------------------------
-// edificio genérico: caja + moldura superior más clara para romper la silueta
+// edificio genérico: caja lisa, techo plano sin moldura ni props — look
+// "silueta plana" de referencia (primera versión 2D): la silueta se rompe
+// solo con altura/ancho variable y el tono índigo/marrón de WALL_STYLES, no
+// con una moldura clara ni antenas/tanques/palomas (addRoofProps queda
+// definida más arriba, sin usar, por si se vuelve a pedir el look anterior).
 // ---------------------------------------------------------------------------
 function buildGeneric(b){
   const group = new THREE.Group();
@@ -279,11 +265,7 @@ function buildGeneric(b){
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(b.width, b.height, BUILDING_DEPTH), mat);
   mesh.position.z = -BUILDING_DEPTH / 2;
   mesh.receiveShadow = true; mesh.castShadow = true;
-  const capMat = new THREE.MeshStandardMaterial({ color: '#f5f2e8', roughness: 0.88, metalness: 0.03 });
-  const cap = new THREE.Mesh(new THREE.BoxGeometry(b.width + 4, 6, BUILDING_DEPTH + 4), capMat);
-  cap.position.set(0, b.height / 2 + 3, -BUILDING_DEPTH / 2);
-  group.add(mesh, cap);
-  addRoofProps(group, b);
+  group.add(mesh);
   return { group, warmMats: [mat] };
 }
 
@@ -298,9 +280,9 @@ function buildEmpire(b){
   // violeta apagado — tonos ligeramente distintos entre escalones para dar
   // algo de relieve, todos dentro de la misma familia "maqueta pulida".
   const stepStyles = [
-    { color: '#f5dd6e', roughness: 0.9, metalness: 0.02, pattern: 'block' },
-    { color: '#f0cf4a', roughness: 0.88, metalness: 0.02, pattern: 'block' },
-    { color: '#e8c02e', roughness: 0.86, metalness: 0.03, pattern: 'block' },
+    { color: '#f5dd6e', roughness: 0.9, metalness: 0.02, pattern: null },
+    { color: '#f0cf4a', roughness: 0.88, metalness: 0.02, pattern: null },
+    { color: '#e8c02e', roughness: 0.86, metalness: 0.03, pattern: null },
   ];
   const steps = [
     { w: b.width, h: b.height * 0.55, y: 0 },
@@ -517,10 +499,16 @@ const SKYLINE_COUNT = isLowTier ? 8 : 14;
 const skylineMeshes = [];
 for (let i = 0; i < SKYLINE_COUNT; i++){
   const h = 90 + ((i * 97) % 220);
-  const seed = i * 733 + 19;
-  const tex = windowTexture(seed, '#140f22');
-  tex.repeat.set(4, Math.max(1, Math.round(h / 45)));
-  const mat = new THREE.MeshBasicMaterial({ color: '#ffffff', map: tex });
+  // silueta lisa, sin ventanas — igual que drawBuildings() en la versión 2D
+  // original (un solo fillRect semitransparente por edificio de fondo, sin
+  // mosaico de ventanas). El color se recalcula cada frame en update() como
+  // una mezcla opaca contra el tono bajo del cielo (ver comentario ahí) para
+  // fingir el mismo efecto de superposición semitransparente del 2D sin
+  // meter objetos transparentes reales en el pipeline (eso rompería el orden
+  // de dibujado: Three.js pinta la cola "transparent" siempre después de la
+  // opaca, sin importar la profundidad real, y este skyline quedaría por
+  // ENCIMA de los edificios de primer plano en vez de detrás).
+  const mat = new THREE.MeshBasicMaterial({ color: '#140a23' });
   const m = new THREE.Mesh(new THREE.BoxGeometry(170, h, 40), mat);
   m.userData.h = h;
   cityGroup.add(m);
@@ -876,13 +864,22 @@ export function update(){
   const parSpacing = 260;
   const parBase = state.cameraX * 0.25;
   const startIndex = Math.floor(parBase / parSpacing) - Math.floor(SKYLINE_COUNT / 2);
-  const skylineTone = sky.isNight ? 1.1 : 0.65;
+  // mezcla opaca contra sky.low (el tono del cielo bajo, justo donde vive
+  // este skyline) — imita a mano el mismo `rgba(20,10,35,.55)` día /
+  // `rgba(5,5,15,.65)` noche semitransparente de la versión 2D original
+  // (ver comentario en la creación de skylineMeshes más arriba sobre por qué
+  // no es transparencia real). De día el tinte queda más claro/azulado
+  // (mezcla con el celeste del cielo diurno); al atardecer, al mezclarse con
+  // el naranja del horizonte, da justo ese marrón apagado de la referencia.
+  const skylineTint = sky.isNight ? '#05050f' : '#140a23';
+  const skylineAlpha = sky.isNight ? 0.65 : 0.55;
+  const skylineColor = lerpHexToHexString(sky.low, skylineTint, skylineAlpha);
   for (let i = 0; i < skylineMeshes.length; i++){
     const m = skylineMeshes[i];
     const sceneX = (startIndex + i) * parSpacing;
     const sceneY = -(state.groundY - m.userData.h / 2);
     m.position.set(sceneX, sceneY, -700);
-    m.material.color.setScalar(skylineTone);
+    m.material.color.set(skylineColor);
   }
 
   // calle con vida (autos + peatones): puramente decorativo, ver bloque de

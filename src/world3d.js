@@ -223,6 +223,12 @@ composer.addPass(new RenderPass(scene, camera));
 export const outlinePass = new ShaderPass(OutlineShader);
 outlinePass.uniforms.resolution.value.set(W * TIER.pixelRatio, H * TIER.pixelRatio);
 outlinePass.uniforms.edgeStrength.value = 1.8;
+// pase "look silueta plana" (referencia: primera versión 2D del juego, sin
+// contorno tipo cómic) — se apaga el post-proceso de contorno. Se deja el
+// shader entero armado (no se borra) por si en algún momento se vuelve a
+// pedir el look tipo Jetpack Joyride. `enabled = false` además es gratis en
+// términos de rendimiento: EffectComposer se salta el pase por completo.
+outlinePass.enabled = false;
 composer.addPass(outlinePass);
 export const bloomPass = new UnrealBloomPass(new THREE.Vector2(W * TIER.bloomRes, H * TIER.bloomRes), 0.85, 0.5, 0.72);
 composer.addPass(bloomPass);
