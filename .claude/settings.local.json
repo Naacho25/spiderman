@@ -55,7 +55,10 @@
       "Bash(unzip -o -j pattern-pack.zip PNG/Default/pattern_2*.png PNG/Default/pattern_0*.png PNG/Default/pattern_6*.png -d /c/Users/usuario/AppData/Local/Temp/claude/C--Users-usuario-Desktop-SPIDERMAN---code/abf244fc-5935-4f09-ad7e-41ed990524a1/scratchpad/patterns)",
       "Read(//c/Users/usuario/AppData/Local/Temp/claude/C--Users-usuario-Desktop-SPIDERMAN---code/abf244fc-5935-4f09-ad7e-41ed990524a1/scratchpad/patterns/**)",
       "Bash(git commit -m 'Edificios: fachadas con textura real de ladrillo/bloque \\(Kenney Pattern Pack, CC0\\) *)",
-      "Bash(git commit -m 'Volver al look '\\\\''silueta plana'\\\\'' de la version 2D original \\(a pedido, con captura de referencia\\) *)"
+      "Bash(git commit -m 'Volver al look '\\\\''silueta plana'\\\\'' de la version 2D original \\(a pedido, con captura de referencia\\) *)",
+      "Read(//c/Users/usuario/.claude/projects/C--Users-usuario-Desktop-SPIDERMAN---code/abf244fc-5935-4f09-ad7e-41ed990524a1/tool-results/**)",
+      "Read(//tmp/**)",
+      "Bash(git commit -m 'Detalle de fachada tipo Nueva York: ventanas marcadas, balcones y escalera de incendio *)"
     ]
   }
 }

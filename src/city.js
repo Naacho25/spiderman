@@ -45,13 +45,43 @@ function makeRng(seed){
 // la distancia de juego un blob simple alcanza, y sale gratis en términos de
 // geometría/draw calls (nada de instancing necesario para esto).
 // ---------------------------------------------------------------------------
-function windowTexture(seed, bgColor){
-  const c = document.createElement('canvas');
+function makeCanvasTex(canvas){
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  // sin esto, la grilla de ventanas (chica, alto contraste, repetida varias
+  // veces por edificio) hace muaré/entramado diagonal apenas se la ve a
+  // distancia o de costado — es el sampleo por mip normal de Three.js sin
+  // filtrado anisotrópico, no un bug del dibujo en sí. maxAnisotropy en un
+  // edificio angosto de perfil no cuesta nada (misma textura de siempre,
+  // solo mejor filtrada) y es la corrección estándar para este artefacto.
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
+
+// devuelve DOS texturas alineadas (mismo seed, misma grilla, mismas celdas
+// salteadas) para la misma fachada:
+//  - mapTex:  el "hueco de ventana" en sí — SIEMPRE visible (de día, de noche,
+//    prendida o apagada), oscurecido levemente contra la pared. Sin esto la
+//    fachada es un rectángulo de color liso sin ninguna abertura marcada
+//    (el reclamo de "sin ventanas": antes la única pista de que había
+//    ventanas era el brillo de las prendidas, que de día casi no se nota).
+//  - emTex: el brillo cálido de las ventanas "prendidas" de noche —
+//    exactamente lo que antes hacía windowTexture() sola, ahora separado.
+// Comparten un único recorrido de rng() para que ambas grillas queden
+// perfectamente alineadas (el brillo aparece justo sobre el hueco correcto).
+function makeFacadeTextures(seed, bgColor){
   const SIZE = TEX_SIZE;
-  c.width = SIZE; c.height = SIZE;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = bgColor || '#0e0a16';
-  ctx.fillRect(0, 0, SIZE, SIZE);
+  const mapCanvas = document.createElement('canvas');
+  mapCanvas.width = SIZE; mapCanvas.height = SIZE;
+  const mapCtx = mapCanvas.getContext('2d');
+  mapCtx.fillStyle = '#ffffff'; // blanco: no altera el color de la pared (map * color = color)
+  mapCtx.fillRect(0, 0, SIZE, SIZE);
+
+  const emCanvas = document.createElement('canvas');
+  emCanvas.width = SIZE; emCanvas.height = SIZE;
+  const emCtx = emCanvas.getContext('2d');
+  emCtx.fillStyle = bgColor || '#0e0a16';
+  emCtx.fillRect(0, 0, SIZE, SIZE);
 
   // look "silueta plana" (referencia: primera versión 2D) — grilla prolija de
   // cuadraditos, la gran mayoría prendidos, directo sobre la fachada (sin
@@ -67,26 +97,34 @@ function windowTexture(seed, bgColor){
       const wx = col * cw + cw * 0.22, wy = r * ch + ch * 0.22;
       const ww = cw * 0.56, wh = ch * 0.56;
       const radius = Math.min(ww, wh) * 0.18;
+      const frameM = Math.min(ww, wh) * 0.16;
 
-      ctx.fillStyle = isLit
+      // marco (sill) más CLARO alrededor + vidrio más OSCURO adentro — el
+      // contraste en las dos direcciones es lo que hace que el hueco de
+      // ventana se lea con claridad contra la pared, no un solo tono apenas
+      // distinto (eso era casi invisible: la queja original de "sin
+      // ventanas" era justamente que de día no se notaban).
+      mapCtx.fillStyle = 'rgba(255,255,255,0.22)';
+      mapCtx.beginPath();
+      if (mapCtx.roundRect) mapCtx.roundRect(wx - frameM, wy - frameM, ww + frameM * 2, wh + frameM * 2, radius + frameM);
+      else mapCtx.rect(wx - frameM, wy - frameM, ww + frameM * 2, wh + frameM * 2);
+      mapCtx.fill();
+      mapCtx.fillStyle = 'rgba(0,0,0,0.55)';
+      mapCtx.beginPath();
+      if (mapCtx.roundRect) mapCtx.roundRect(wx, wy, ww, wh, radius);
+      else mapCtx.rect(wx, wy, ww, wh);
+      mapCtx.fill();
+
+      emCtx.fillStyle = isLit
         ? 'rgba(255,214,130,0.95)' // "prendida" — mismo tono exacto que la versión 2D original
         : 'rgba(45,55,95,0.7)';    // "apagada": chata, sin reflejo ni variación de brillo
-      ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(wx, wy, ww, wh, radius);
-      else ctx.rect(wx, wy, ww, wh);
-      ctx.fill();
+      emCtx.beginPath();
+      if (emCtx.roundRect) emCtx.roundRect(wx, wy, ww, wh, radius);
+      else emCtx.rect(wx, wy, ww, wh);
+      emCtx.fill();
     }
   }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  // sin esto, la grilla de ventanas (chica, alto contraste, repetida varias
-  // veces por edificio) hace muaré/entramado diagonal apenas se la ve a
-  // distancia o de costado — es el sampleo por mip normal de Three.js sin
-  // filtrado anisotrópico, no un bug del dibujo en sí. maxAnisotropy en un
-  // edificio angosto de perfil no cuesta nada (misma textura de siempre,
-  // solo mejor filtrada) y es la corrección estándar para este artefacto.
-  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  return tex;
+  return { mapTex: makeCanvasTex(mapCanvas), emTex: makeCanvasTex(emCanvas) };
 }
 
 // mismos dos patrones planos (blanco/negro, CC0, "Pattern Pack" de Kenney.nl:
@@ -137,8 +175,10 @@ function tintedWallColor(seedX){
 }
 
 function makeFacadeMaterial(width, height, style, seed){
-  const tex = windowTexture(seed);
-  tex.repeat.set(Math.max(1, Math.round(width / 40)), Math.max(1, Math.round(height / 45)));
+  const { mapTex, emTex } = makeFacadeTextures(seed);
+  const repCols = Math.max(1, Math.round(width / 40)), repRows = Math.max(1, Math.round(height / 45));
+  mapTex.repeat.set(repCols, repRows);
+  emTex.repeat.set(repCols, repRows);
   // acepta un string (color plano, criterio viejo) o un objeto de estilo
   // {color, roughness, metalness, pattern} (criterio nuevo, ver WALL_STYLES)
   // — así los landmarks pueden seguir pasando su propio hex sin romper la
@@ -152,15 +192,18 @@ function makeFacadeMaterial(width, height, style, seed){
   // cartoon), y de paso es una textura menos por edificio para samplear.
   const params = {
     color: baseColor,
+    map: mapTex, // el hueco de ventana en sí — visible siempre, no solo cuando "prendida"
     emissive: new THREE.Color('#6a4a1e'),
-    emissiveMap: tex,
+    emissiveMap: emTex,
     emissiveIntensity: 0.5,
     roughness, metalness,
   };
   if (pattern){
-    // clon liviano (comparte la imagen ya decodificada, solo duplica el
-    // Texture para poder tener un `repeat` propio por edificio) — mismo
-    // criterio que ya usa windowTexture() de crear una textura por edificio.
+    // el ladrillo/bloque de Kenney (ronda "Jetpack Joyride", sin usar en el
+    // look actual) pisaría el mismo slot `map` que la grilla de ventanas de
+    // arriba — no hay forma de combinar ambos sin hornearlos en una sola
+    // textura, así que si algún estilo pide patrón, gana el patrón (permite
+    // retomar ese look sin tener que tocar esta función otra vez).
     const base = pattern === 'brick' ? brickPatternTex : blockPatternTex;
     const map = base.clone();
     map.needsUpdate = true;
@@ -251,11 +294,81 @@ function addRoofProps(group, b){
 }
 
 // ---------------------------------------------------------------------------
-// edificio genérico: caja lisa, techo plano sin moldura ni props — look
-// "silueta plana" de referencia (primera versión 2D): la silueta se rompe
-// solo con altura/ancho variable y el tono índigo/marrón de WALL_STYLES, no
-// con una moldura clara ni antenas/tanques/palomas (addRoofProps queda
-// definida más arriba, sin usar, por si se vuelve a pedir el look anterior).
+// escalera de incendio (fire escape) y balcones: el detalle de fachada más
+// "característico de Nueva York" que pedía el usuario, además de la ventana
+// en sí. Geometría/material COMPARTIDOS entre todos los edificios que la
+// usan (una sola BoxGeometry(1,1,1), escalada por instancia con .scale.set) —
+// mismo criterio que los props de techo de arriba: barato en draw calls y
+// nunca se dispone en el remove de un edificio individual.
+// ---------------------------------------------------------------------------
+const fireEscapeMat = new THREE.MeshStandardMaterial({ color: '#23222a', roughness: 0.7, metalness: 0.35 });
+const fireEscapeGeo = new THREE.BoxGeometry(1, 1, 1);
+const balconyMat = new THREE.MeshStandardMaterial({ color: '#2e2b38', roughness: 0.8, metalness: 0.1 });
+SHARED_ROOF_GEOMETRIES.add(fireEscapeGeo);
+SHARED_ROOF_MATERIALS.add(fireEscapeMat).add(balconyMat);
+
+function bar(geo, mat, sx, sy, sz, x, y, z, rz){
+  const m = new THREE.Mesh(geo, mat);
+  m.scale.set(sx, sy, sz);
+  m.position.set(x, y, z);
+  if (rz) m.rotation.z = rz;
+  return m;
+}
+
+// escalera de incendio de hierro: columna de descansos (landings) con
+// baranda + tramos diagonales entre uno y el siguiente, corrida sobre un
+// borde del frente del edificio, sobresaliendo levemente hacia la calle
+// (Z > 0, frente al plano z=0 de la física — puramente decorativo, la
+// física no mira geometría 3D, solo b.x/b.width/b.height). Devuelve true si
+// agregó una (para no amontonarla con un balcón en el mismo edificio).
+function addFireEscape(group, b, rng){
+  if (isLowTier || b.height < 200 || b.width < 55) return false;
+  if (rng() > 0.4) return false;
+  const side = rng() > 0.5 ? 1 : -1;
+  const localX = side * (b.width / 2 - 14);
+  const floorSpacing = 42;
+  const startY = -b.height / 2 + 26;
+  const endY = b.height / 2 - 24;
+  const floors = Math.floor((endY - startY) / floorSpacing);
+  if (floors < 2) return false;
+  const run = side * 9; // desplazamiento horizontal del tramo diagonal
+  let y = startY;
+  for (let i = 0; i < floors; i++){
+    group.add(bar(fireEscapeGeo, fireEscapeMat, 15, 1.2, 7, localX, y, 5));       // descanso (landing)
+    group.add(bar(fireEscapeGeo, fireEscapeMat, 0.8, 6.5, 0.8, localX - 6.5, y + 3.2, 8));  // baranda izq
+    group.add(bar(fireEscapeGeo, fireEscapeMat, 0.8, 6.5, 0.8, localX + 6.5, y + 3.2, 8));  // baranda der
+    group.add(bar(fireEscapeGeo, fireEscapeMat, 15, 0.7, 0.7, localX, y + 6.2, 8));         // pasamanos
+    if (i < floors - 1){
+      const len = Math.hypot(floorSpacing, run);
+      group.add(bar(fireEscapeGeo, fireEscapeMat, 2.4, len, 1, localX + run / 2, y + floorSpacing / 2, 5,
+        -Math.sign(run) * Math.atan2(Math.abs(run), floorSpacing)));
+    }
+    y += floorSpacing;
+  }
+  return true;
+}
+
+// balcones sueltos (menos "escalera completa", más departamento con balcón
+// individual) — en edificios sin escalera de incendio, para variar.
+function addBalconies(group, b, rng){
+  if (isLowTier || b.width < 50) return;
+  if (rng() > 0.35) return;
+  const count = 1 + Math.floor(rng() * 3);
+  for (let i = 0; i < count; i++){
+    const side = rng() > 0.5 ? 1 : -1;
+    const localX = side * (b.width / 2 - 12) * (0.55 + rng() * 0.4);
+    const y = -b.height / 2 + 36 + rng() * Math.max(20, b.height - 90);
+    group.add(bar(fireEscapeGeo, balconyMat, 13, 1.4, 6.5, localX, y, 4.2));       // piso del balcón
+    group.add(bar(fireEscapeGeo, balconyMat, 13, 4.5, 0.7, localX, y + 2.8, 7.2)); // baranda frontal
+  }
+}
+
+// ---------------------------------------------------------------------------
+// edificio genérico: caja lisa (sin moldura, look "silueta plana" de
+// referencia) + detalle de fachada característico de Nueva York — ventana
+// marcada (siempre visible, ver makeFacadeTextures), escalera de incendio o
+// balcones en algunos, y props de techo (antena/tanque de agua/paloma) en
+// otros — variación edificio a edificio, no todos tienen de todo.
 // ---------------------------------------------------------------------------
 function buildGeneric(b){
   const group = new THREE.Group();
@@ -266,6 +379,11 @@ function buildGeneric(b){
   mesh.position.z = -BUILDING_DEPTH / 2;
   mesh.receiveShadow = true; mesh.castShadow = true;
   group.add(mesh);
+  // seed distinto al de addRoofProps (+500) para que no arranquen
+  // correlacionados (mismo primer número random en ambas tiradas).
+  const detailRng = makeRng(Math.floor(b.x * 3.1) + 700);
+  if (!addFireEscape(group, b, detailRng)) addBalconies(group, b, detailRng);
+  addRoofProps(group, b);
   return { group, warmMats: [mat] };
 }
 
