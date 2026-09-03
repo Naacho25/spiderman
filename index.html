@@ -1645,12 +1645,21 @@ function drawSky(){
     ctx.fillStyle = 'rgba(235,240,255,.9)'; ctx.fill();
   }
 
-  // silueta lejana (parallax) — más oscura de noche
+  // silueta lejana (parallax) — más oscura de noche.
+  // la altura de cada edificio de fondo se calcula a partir de su índice de mosaico
+  // FIJO en el mundo (no del índice de dibujado en pantalla), así el mismo edificio
+  // siempre tiene la misma altura sin importar hacia dónde se mueva la cámara —
+  // antes, al balancearse cerca de un punto, el fondo "cambiaba" de golpe al cruzar
+  // el borde del ciclo de repetición.
   ctx.fillStyle = sky.isNight ? 'rgba(5,5,15,.65)' : 'rgba(20,10,35,.55)';
-  const parX = -((cameraX*0.25) % 260);
-  for (let i=-1; i<W/260+2; i++){
-    const bx = parX + i*260;
-    const bh = 90 + ((i*97)%140);
+  const parCamX = cameraX * 0.25;
+  const tileW = 260;
+  const firstTile = Math.floor((parCamX - 20) / tileW) - 1;
+  const lastTile = Math.floor((parCamX + W + 20) / tileW) + 1;
+  for (let ti = firstTile; ti <= lastTile; ti++){
+    const bx = ti*tileW - parCamX;
+    const normIdx = ((ti % 50) + 50) % 50; // índice siempre positivo, fijo por mosaico
+    const bh = 90 + (normIdx*97) % 140;
     ctx.fillRect(bx, groundY-bh, 170, bh);
   }
 }
@@ -1675,8 +1684,8 @@ function drawGround(){
   ctx.lineWidth = 4;
   ctx.setLineDash([28,20]);
   ctx.beginPath();
-  ctx.moveTo(0, groundY+18);
-  ctx.lineTo(W, groundY+18);
+  ctx.moveTo(0, groundY+36);
+  ctx.lineTo(W, groundY+36);
   ctx.stroke();
   ctx.setLineDash([]);
 }
@@ -1726,11 +1735,13 @@ function drawPedestrians(){
 }
 
 function drawCars(){
-  const roadY = groundY + 34;
+  // carril separado según el sentido de circulación: cada dirección tiene su propia
+  // franja de la calle, como en una calle real de doble sentido
   for (const c of cars){
     const sx = c.x - cameraX;
     if (sx < -70 || sx > W + 70) continue;
     const facing = c.dir;
+    const roadY = facing > 0 ? groundY + 22 : groundY + 50;
     ctx.save();
     ctx.translate(sx, roadY);
     ctx.scale(facing, 1);
@@ -2213,6 +2224,7 @@ function drawPickupMsg(){
 }
 
 function drawEnemies(){
+  const now = Date.now();
   for (const en of enemies){
     const sx = en.drawX !== undefined ? en.drawX - cameraX : en.x - cameraX;
     if (sx < -60 || sx > W + 60) continue;
@@ -2227,30 +2239,44 @@ function drawEnemies(){
     ctx.fillStyle = glow;
     ctx.beginPath(); ctx.arc(0,2,36,0,Math.PI*2); ctx.fill();
 
-    // tabla voladora
+    // capa/manto ondeando detrás, como un pequeño duende alado
+    const capeWave = Math.sin(now/180 + en.phase) * 5;
+    ctx.fillStyle = '#3a1f52';
+    ctx.beginPath();
+    ctx.moveTo(-4*dir, -10);
+    ctx.quadraticCurveTo(-22*dir, 0 + capeWave, -18*dir, 20 + capeWave*0.6);
+    ctx.quadraticCurveTo(-10*dir, 8, -2*dir, 10);
+    ctx.closePath(); ctx.fill();
+
+    // planeador puntiagudo (referencia a un glider de duende), en vez de tabla lisa
     ctx.fillStyle = '#22301f';
     ctx.beginPath();
-    ctx.ellipse(0, 17, 25, 6, 0, 0, Math.PI*2);
+    ctx.moveTo(-27, 17); ctx.quadraticCurveTo(0, 10, 27, 17);
+    ctx.quadraticCurveTo(0, 24, -27, 17);
     ctx.fill();
     ctx.strokeStyle = '#8bff5a';
     ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.ellipse(0, 17, 25, 6, 0, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-27, 17); ctx.quadraticCurveTo(0, 10, 27, 17); ctx.quadraticCurveTo(0, 24, -27, 17); ctx.stroke();
 
     ctx.lineCap = 'round';
 
-    // piernas (verde oscuro), pose parada/flexionada sobre la tabla
-    ctx.strokeStyle = '#28471f';
+    // piernas (verde oscuro con calza púrpura), pose parada/flexionada sobre el planeador
+    ctx.strokeStyle = '#3a1f52';
     ctx.lineWidth = 5.5;
     ctx.beginPath();
     ctx.moveTo(0, 5); ctx.lineTo(-8*dir, 16);
     ctx.moveTo(0, 5); ctx.lineTo(9*dir, 15);
     ctx.stroke();
 
-    // torso (verde)
+    // torso (verde piel de duende con peto púrpura)
     ctx.fillStyle = '#357a2c';
     ctx.beginPath();
     ctx.ellipse(0, -3, 9, 12, 0, 0, Math.PI*2);
     ctx.fill();
+    ctx.fillStyle = '#4a2568';
+    ctx.beginPath();
+    ctx.moveTo(-6, -12); ctx.lineTo(6, -12); ctx.lineTo(4, 4); ctx.lineTo(-4, 4);
+    ctx.closePath(); ctx.fill();
 
     // brazos abiertos, en pose de vuelo/equilibrio
     ctx.strokeStyle = '#357a2c';
@@ -2260,19 +2286,31 @@ function drawEnemies(){
     ctx.moveTo(0, -7); ctx.lineTo(-15*dir, -1);
     ctx.stroke();
 
-    // capucha (verde muy oscuro / casi negra), cubre la cabeza dejando la cara en sombra
-    ctx.fillStyle = '#1a2b14';
+    // cabeza verde de duende: cráneo alargado, orejas puntiagudas, cejas filosas y sonrisa siniestra
+    ctx.fillStyle = '#3d8a32';
     ctx.beginPath();
-    ctx.moveTo(-10, -14);
-    ctx.quadraticCurveTo(-13, -30, 0, -30);
-    ctx.quadraticCurveTo(13, -30, 10, -14);
-    ctx.quadraticCurveTo(0, -19, -10, -14);
+    ctx.moveTo(-6.5, -14);
+    ctx.quadraticCurveTo(-9, -30, 0, -31);
+    ctx.quadraticCurveTo(9, -30, 6.5, -14);
+    ctx.quadraticCurveTo(0, -10, -6.5, -14);
     ctx.closePath();
     ctx.fill();
-
-    // rostro en sombra bajo la capucha
-    ctx.fillStyle = '#0c1409';
-    ctx.beginPath(); ctx.ellipse(0, -19, 6.5, 6, 0, 0, Math.PI*2); ctx.fill();
+    // orejas puntiagudas
+    ctx.beginPath();
+    ctx.moveTo(-6.5, -19); ctx.lineTo(-12, -24); ctx.lineTo(-5.5, -22); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(6.5, -19); ctx.lineTo(12, -24); ctx.lineTo(5.5, -22); ctx.closePath(); ctx.fill();
+    // cejas oscuras filosas, en punta hacia el centro (gesto amenazante)
+    ctx.fillStyle = '#1a2b14';
+    ctx.beginPath(); ctx.moveTo(-6, -22); ctx.lineTo(-1.5, -20); ctx.lineTo(-6, -19.5); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(6, -22); ctx.lineTo(1.5, -20); ctx.lineTo(6, -19.5); ctx.closePath(); ctx.fill();
+    // sonrisa siniestra con dientes
+    ctx.fillStyle = '#12220e';
+    ctx.beginPath(); ctx.moveTo(-5, -13); ctx.quadraticCurveTo(0, -9, 5, -13); ctx.quadraticCurveTo(0, -12.5, -5, -13); ctx.fill();
+    ctx.fillStyle = '#fff';
+    for (let ti = -4; ti <= 4; ti += 2.2){
+      ctx.beginPath(); ctx.moveTo(ti, -12.6); ctx.lineTo(ti+1.1, -12.6); ctx.lineTo(ti+0.55, -11.2); ctx.closePath(); ctx.fill();
+    }
 
     // ojos brillosos amarillos
     ctx.fillStyle = '#ffe066';
@@ -2324,25 +2362,42 @@ function drawClimbers(){
     drawArm(8, 5, 1, 4.7);
 
     // piernas cortas, agarradas a la pared
-    ctx.strokeStyle = '#3a3f47';
+    ctx.strokeStyle = '#2b2e34';
     ctx.lineWidth = 4.5;
     ctx.beginPath();
     ctx.moveTo(-4, 11); ctx.lineTo(-8, 20);
     ctx.moveTo(4, 11); ctx.lineTo(8, 20);
     ctx.stroke();
 
-    // torso vertical (forma de persona, no un blob redondo)
+    // guardapolvo de laboratorio (torso claro con solapa oscura), forma de persona
+    ctx.fillStyle = '#d8d3c4';
+    ctx.beginPath(); ctx.ellipse(0, 1, 9, 13, 0, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#3a3f47';
-    ctx.beginPath(); ctx.ellipse(0, 0, 9, 13, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-3, -10); ctx.lineTo(0, -1); ctx.lineTo(3, -10);
+    ctx.lineTo(2, -11); ctx.lineTo(0, -4); ctx.lineTo(-2, -11);
+    ctx.closePath(); ctx.fill();
 
-    // cabeza
-    ctx.beginPath(); ctx.arc(0, -17, 7.5, 0, Math.PI*2); ctx.fill();
-
-    // lente/ojo rojo brillante, único y centrado (referencia mecánica, no rostro humano)
+    // cabeza calva con anteojos redondos (científico), no un lente único robótico
+    ctx.fillStyle = '#d9b48f';
+    ctx.beginPath(); ctx.arc(0, -17, 7.2, 0, Math.PI*2); ctx.fill();
+    // mechones canosos a los costados
+    ctx.fillStyle = '#8a8a8a';
+    ctx.beginPath(); ctx.ellipse(-6, -14, 2.6, 4, 0.3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(6, -14, 2.6, 4, -0.3, 0, Math.PI*2); ctx.fill();
+    // anteojos redondos con vidrios rojos brillantes (guiño mecánico sin ser un ojo único)
+    ctx.strokeStyle = '#2b2e34'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(-3.2, -18, 3, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(3.2, -18, 3, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-0.4, -18); ctx.lineTo(0.4, -18); ctx.stroke();
     ctx.fillStyle = '#ff3b3b';
-    ctx.shadowColor = '#ff3b3b'; ctx.shadowBlur = 9;
-    ctx.beginPath(); ctx.ellipse(0, -17, 4, 2.6, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowColor = '#ff3b3b'; ctx.shadowBlur = 7;
+    ctx.beginPath(); ctx.arc(-3.2, -18, 2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(3.2, -18, 2, 0, Math.PI*2); ctx.fill();
     ctx.shadowBlur = 0;
+    // ceño fruncido
+    ctx.strokeStyle = '#5c4632'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(-5.5, -22); ctx.lineTo(-1.5, -21); ctx.moveTo(5.5, -22); ctx.lineTo(1.5, -21); ctx.stroke();
 
     ctx.restore();
   }
@@ -2372,6 +2427,26 @@ function drawSandHands(){
     ctx.moveTo(-17, 4); ctx.lineTo(-13, -handH+28); ctx.lineTo(13, -handH+28); ctx.lineTo(17, 4);
     ctx.closePath(); ctx.fill();
 
+    // textura granulada de arena sobre el antebrazo (posiciones fijas por mano, no parpadean)
+    let seed = Math.floor(s.x) % 9973;
+    const rnd = () => { seed = (seed*9301 + 49297) % 233280; return seed/233280; };
+    ctx.fillStyle = 'rgba(90,65,35,.35)';
+    for (let g = 0; g < 14; g++){
+      const gy = -4 - rnd()*(handH-30);
+      const gx = -13 + rnd()*26;
+      ctx.beginPath(); ctx.arc(gx, gy, 1.1 + rnd()*1.1, 0, Math.PI*2); ctx.fill();
+    }
+
+    // un rostro tosco a medio formar en la muñeca, como si el propio hombre de arena
+    // asomara la cara — típico del villano de arena, no una mano genérica
+    ctx.fillStyle = 'rgba(70,50,28,.55)';
+    ctx.beginPath(); ctx.ellipse(0, -handH+42, 9, 7, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = `rgba(255,200,120,${0.35 + hf*0.4})`;
+    ctx.beginPath(); ctx.ellipse(-3.2, -handH+41, 1.4, 1.8, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(3.2, -handH+41, 1.4, 1.8, 0, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(60,42,24,.7)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(-3, -handH+45); ctx.quadraticCurveTo(0, -handH+43, 3, -handH+45); ctx.stroke();
+
     // mano y dedos
     ctx.translate(0, -handH + 28);
     ctx.fillStyle = '#c9a56b';
@@ -2381,6 +2456,11 @@ function drawSandHands(){
       ctx.beginPath();
       ctx.ellipse(fx, -flen/2 + 2, 6.5, flen/2, 0, 0, Math.PI*2);
       ctx.fill();
+    });
+    // pequeños grumos de arena desprendiéndose de los nudillos, para reforzar la textura granulada
+    ctx.fillStyle = 'rgba(90,65,35,.4)';
+    [-19, -8, 4, 15].forEach((fx) => {
+      ctx.beginPath(); ctx.arc(fx + 2, -3, 2, 0, Math.PI*2); ctx.fill();
     });
 
     ctx.restore();
@@ -2408,7 +2488,7 @@ function drawRhinos(){
     ctx.moveTo(10, -6); ctx.lineTo(10 - legPhase*8, 4);
     ctx.stroke();
 
-    // cuerpo macizo
+    // cuerpo macizo, tipo armadura gruesa de piel de rinoceronte
     ctx.fillStyle = '#5b6570';
     ctx.beginPath();
     ctx.ellipse(-2, -20, 30, 18, 0, 0, Math.PI*2);
@@ -2416,18 +2496,42 @@ function drawRhinos(){
     // placas del lomo
     ctx.fillStyle = '#454e57';
     ctx.beginPath(); ctx.ellipse(-2, -30, 24, 8, 0, 0, Math.PI*2); ctx.fill();
-
-    // cabeza y cuerno
-    ctx.fillStyle = '#5b6570';
-    ctx.beginPath(); ctx.ellipse(24, -18, 13, 11, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#d8d0c0';
+    // costurones/grietas de la coraza, para que la piel se vea rugosa y no lisa
+    ctx.strokeStyle = 'rgba(35,40,46,.55)';
+    ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.moveTo(33, -22); ctx.lineTo(48, -30); ctx.lineTo(34, -14);
-    ctx.closePath(); ctx.fill();
+    ctx.moveTo(-20, -26); ctx.lineTo(-14, -16); ctx.lineTo(-20, -8);
+    ctx.moveTo(-4, -30); ctx.lineTo(-2, -18);
+    ctx.moveTo(10, -28); ctx.lineTo(14, -18); ctx.lineTo(9, -10);
+    ctx.stroke();
+    // manchas más oscuras (textura de cuero curtido)
+    ctx.fillStyle = 'rgba(35,40,46,.3)';
+    ctx.beginPath(); ctx.ellipse(-12, -22, 4, 3, 0.4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(4, -12, 3.5, 2.5, -0.3, 0, Math.PI*2); ctx.fill();
 
-    // ojo
+    // cabeza maciza y cuerno grande y curvo (rasgo distintivo, más grande que antes)
+    ctx.fillStyle = '#5b6570';
+    ctx.beginPath(); ctx.ellipse(25, -17, 15, 12, 0, 0, Math.PI*2); ctx.fill();
+    // pliegues de piel en el hocico
+    ctx.strokeStyle = 'rgba(35,40,46,.5)'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(32, -12); ctx.lineTo(36, -14); ctx.moveTo(32, -8); ctx.lineTo(37, -9); ctx.stroke();
+    ctx.fillStyle = '#e4dcc8';
+    ctx.beginPath();
+    ctx.moveTo(35, -24); ctx.quadraticCurveTo(46, -30, 54, -36);
+    ctx.quadraticCurveTo(44, -24, 36, -13);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(150,140,110,.6)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(38, -22); ctx.lineTo(43, -28); ctx.stroke();
+
+    // orejitas pequeñas y redondeadas
+    ctx.fillStyle = '#454e57';
+    ctx.beginPath(); ctx.ellipse(14, -30, 4, 5, 0.5, 0, Math.PI*2); ctx.fill();
+
+    // ojo pequeño y entrecerrado (mirada fija de embestida)
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.ellipse(29, -19, 2.2, 1.3, 0.2, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#ff5a3c';
-    ctx.beginPath(); ctx.ellipse(28, -20, 2, 1.6, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(29.5, -19, 1, 0.7, 0.2, 0, Math.PI*2); ctx.fill();
 
     ctx.restore();
   }
@@ -2442,9 +2546,33 @@ function drawScorpions(){
     ctx.save();
     ctx.translate(sx, s.y);
 
-    // cuerpo agazapado
+    // patas segmentadas cortas a los costados (insecto agazapado sobre el techo)
+    const legTwitch = Math.sin(now/260 + s.x*0.02) * 1.4;
+    ctx.strokeStyle = '#16281c'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-8, 2); ctx.lineTo(-15, 6 + legTwitch); ctx.lineTo(-20, 4 + legTwitch);
+    ctx.moveTo(-6, 5); ctx.lineTo(-12, 10 - legTwitch); ctx.lineTo(-17, 9 - legTwitch);
+    ctx.moveTo(8, 2); ctx.lineTo(15, 6 - legTwitch); ctx.lineTo(20, 4 - legTwitch);
+    ctx.moveTo(6, 5); ctx.lineTo(12, 10 + legTwitch); ctx.lineTo(17, 9 + legTwitch);
+    ctx.stroke();
+
+    // cuerpo agazapado, exoesqueleto segmentado
     ctx.fillStyle = '#1c3324';
     ctx.beginPath(); ctx.ellipse(0, 0, 11, 8, 0, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(60,107,72,.6)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-6, -4); ctx.lineTo(-6, 4); ctx.moveTo(0, -6); ctx.lineTo(0, 6); ctx.moveTo(6, -4); ctx.lineTo(6, 4); ctx.stroke();
+
+    // pinzas al frente, en pose amenazante — rasgo distintivo del escorpión
+    ctx.strokeStyle = '#274a34'; ctx.lineWidth = 3.2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-8, -2); ctx.lineTo(-16, -8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8, -2); ctx.lineTo(16, -8); ctx.stroke();
+    ctx.fillStyle = '#20452c';
+    [-1, 1].forEach(side => {
+      ctx.beginPath();
+      ctx.moveTo(side*16, -8);
+      ctx.lineTo(side*22, -12); ctx.lineTo(side*20, -8); ctx.lineTo(side*22, -5); ctx.lineTo(side*16, -8);
+      ctx.closePath(); ctx.fill();
+    });
 
     // cola curva sobre el hombro, con aguijón que brilla al cargar
     ctx.strokeStyle = '#274a34';
@@ -2454,6 +2582,11 @@ function drawScorpions(){
     ctx.quadraticCurveTo(-18, -10, -14, -24);
     ctx.quadraticCurveTo(-10, -32, 0, -30);
     ctx.stroke();
+    // segmentos de la cola (aspecto de exoesqueleto articulado)
+    ctx.fillStyle = '#16281c';
+    ctx.beginPath(); ctx.arc(-15, -11, 2.4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-16, -19, 2.2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-9, -27, 2, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = chargeUp > 0.5 ? '#8aff6a' : '#3c6b48';
     if (chargeUp > 0.5){ ctx.shadowColor = '#8aff6a'; ctx.shadowBlur = 8; }
     ctx.beginPath(); ctx.ellipse(0, -30, 4, 3, 0, 0, Math.PI*2); ctx.fill();
