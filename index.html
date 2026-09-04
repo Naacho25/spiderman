@@ -1211,6 +1211,15 @@ function updateTorchAutoShootHud(){
   if (!twoPlayerMode && soloCharacter === 'torch') updateAutoShootHud();
 }
 
+// estilo visual de cada enemigo: en 1P siempre coincide con el personaje elegido
+// (Spiderman ve solo villanos "clásicos", la Antorcha ve solo el reskin
+// homenaje a los Cuatro Fantásticos); en 2P cada instancia tira la moneda por
+// separado, así en una misma partida aparece un mix de ambos mundos
+function pickEnemyStyle(){
+  if (twoPlayerMode) return Math.random() < 0.5 ? 'spiderman' : 'torch';
+  return (soloCharacter === 'torch') ? 'torch' : 'spiderman';
+}
+
 // dificultad progresiva: nada al principio, después va apareciendo y cada vez más seguido
 const DIFF = {
   goblinStart: 300,    // metros desde donde empieza a aparecer el villano volador
@@ -1237,7 +1246,7 @@ function ensureEnemies(){
     while (lastX < cameraX + W + 900){
       lastX += spacingBase + Math.random()*spacingRand;
       const y = groundY - (180 + Math.random()*H*0.4);
-      enemies.push({ x:lastX, y, baseY:y, phase: Math.random()*10, hit:false, counted:false });
+      enemies.push({ x:lastX, y, baseY:y, phase: Math.random()*10, hit:false, counted:false, style: pickEnemyStyle() });
       registerEnemyType('goblin');
     }
   }
@@ -1275,7 +1284,7 @@ function ensureClimbers(){
       const speed = Math.min(1.4, 0.55 + p*0.0004);
       climbers.push({
         x: b.x + b.width*0.5, baseY, climbRange, speed, phase: Math.random()*10,
-        wallTop: top + 12, wallBottom: groundY - 12, hit:false, counted:false
+        wallTop: top + 12, wallBottom: groundY - 12, hit:false, counted:false, style: pickEnemyStyle()
       });
       registerEnemyType('climber');
       lastX = b.x;
@@ -1303,7 +1312,7 @@ function ensureSandHands(){
     while (lastX < cameraX + W + 1200){
       lastX += spacingBase + Math.random()*spacingRand;
       // ciclo propio e independiente: fase inicial al azar para que no estén sincronizadas
-      sandHands.push({ x:lastX, phase: Math.floor(Math.random()*SAND_CYCLE_LEN), heightFactor:0, topY:groundY, hit:false, counted:false });
+      sandHands.push({ x:lastX, phase: Math.floor(Math.random()*SAND_CYCLE_LEN), heightFactor:0, topY:groundY, hit:false, counted:false, style: pickEnemyStyle() });
       registerEnemyType('sandhand');
     }
   }
@@ -1329,7 +1338,7 @@ function ensureRhinos(){
     while (lastX < cameraX + W + 1000){
       lastX += spacingBase + Math.random()*spacingRand;
       const speed = Math.min(5.5, 2.3 + p*0.001);
-      rhinos.push({ x:lastX, spawnX:lastX, speed, hit:false, counted:false });
+      rhinos.push({ x:lastX, spawnX:lastX, speed, hit:false, counted:false, style: pickEnemyStyle() });
       registerEnemyType('rhino');
     }
   }
@@ -1360,7 +1369,7 @@ function ensureScorpions(){
       if (Math.random() > 0.55) continue;
       const top = groundY - b.height;
       const baseCooldown = Math.max(65, 210 - p*0.07);
-      scorpions.push({ x: b.x + b.width*0.5, y: top - 4, baseCooldown, cooldown: baseCooldown*0.6, hit:false, counted:false });
+      scorpions.push({ x: b.x + b.width*0.5, y: top - 4, baseCooldown, cooldown: baseCooldown*0.6, hit:false, counted:false, style: pickEnemyStyle() });
       registerEnemyType('scorpion');
       lastX = b.x;
     }
@@ -2060,14 +2069,30 @@ function update(){
     }
     s.heightFactor = heightFrac;
     s.alert = alert;
-    s.topY = groundY - heightFrac * sandMaxReach;
-    if (player.alive && !s.hit && heightFrac > 0.3 && Math.abs(player.x - s.x) < 55 && player.y >= s.topY - 12){
-      s.hit = true;
-      if (resolveCharacterHit('p1', '¡Te escapaste de la mano de arena! ❤️', '✋ La mano de arena te atrapó')) s.defeated = true;
-    }
-    if ((twoPlayerMode || soloCharacter === 'torch') && torch.alive && !s.hit && heightFrac > 0.3 && Math.abs(torch.x - s.x) < 55 && torch.y >= s.topY - 12){
-      s.hit = true;
-      if (resolveCharacterHit('torch', '¡La Antorcha se escapó de la mano de arena! ❤️', '✋ La mano de arena atrapó a la Antorcha')) s.defeated = true;
+    // homenaje al brazo de Galactus (estilo 'torch'): en vez de emerger del piso,
+    // desciende desde arriba de la pantalla — mismo ciclo de 5 etapas y misma
+    // fórmula de alcance máximo, solo cambia el origen/dirección vertical
+    if (s.style === 'torch'){
+      const topEdgeY = -40;
+      s.topY = topEdgeY + heightFrac * sandMaxReach; // profundidad actual del brazo, bajando desde arriba
+      if (player.alive && !s.hit && heightFrac > 0.3 && Math.abs(player.x - s.x) < 55 && player.y <= s.topY + 12){
+        s.hit = true;
+        if (resolveCharacterHit('p1', '¡Te escapaste del brazo de Galactus! ❤️', '✋ El brazo de Galactus te atrapó')) s.defeated = true;
+      }
+      if ((twoPlayerMode || soloCharacter === 'torch') && torch.alive && !s.hit && heightFrac > 0.3 && Math.abs(torch.x - s.x) < 55 && torch.y <= s.topY + 12){
+        s.hit = true;
+        if (resolveCharacterHit('torch', '¡La Antorcha se escapó del brazo de Galactus! ❤️', '✋ El brazo de Galactus atrapó a la Antorcha')) s.defeated = true;
+      }
+    } else {
+      s.topY = groundY - heightFrac * sandMaxReach;
+      if (player.alive && !s.hit && heightFrac > 0.3 && Math.abs(player.x - s.x) < 55 && player.y >= s.topY - 12){
+        s.hit = true;
+        if (resolveCharacterHit('p1', '¡Te escapaste de la mano de arena! ❤️', '✋ La mano de arena te atrapó')) s.defeated = true;
+      }
+      if ((twoPlayerMode || soloCharacter === 'torch') && torch.alive && !s.hit && heightFrac > 0.3 && Math.abs(torch.x - s.x) < 55 && torch.y >= s.topY - 12){
+        s.hit = true;
+        if (resolveCharacterHit('torch', '¡La Antorcha se escapó de la mano de arena! ❤️', '✋ La mano de arena atrapó a la Antorcha')) s.defeated = true;
+      }
     }
   }
   sandHands = sandHands.filter(s => !s.defeated);
@@ -2100,7 +2125,7 @@ function update(){
         const dx = activeX() - s.x, dy = activeY() - s.y;
         const dist = Math.hypot(dx, dy) || 1;
         const speed = 6.5;
-        poisonBolts.push({ x:s.x, y:s.y, vx: dx/dist*speed, vy: dy/dist*speed - 1.4 });
+        poisonBolts.push({ x:s.x, y:s.y, vx: dx/dist*speed, vy: dy/dist*speed - 1.4, style: s.style });
       }
     }
   }
@@ -3044,6 +3069,74 @@ function drawPickupMsg(){
   ctx.restore();
 }
 
+// homenaje a Silver Surfer (estilo 'torch'): humanoide cromado sobre una tabla
+// plana, con una estela de energía cósmica azul/cian en vez de capa de duende
+function drawSilverSurferEnemy(en, dir, now){
+  const trailWave = Math.sin(now/180 + en.phase) * 5;
+  // estela cósmica detrás
+  const trailGrad = ctx.createLinearGradient(-30*dir, 0, 4*dir, 0);
+  trailGrad.addColorStop(0, 'rgba(77,208,225,0)');
+  trailGrad.addColorStop(1, 'rgba(140,230,255,.65)');
+  ctx.fillStyle = trailGrad;
+  ctx.beginPath();
+  ctx.moveTo(-4*dir, -8);
+  ctx.quadraticCurveTo(-26*dir, 2 + trailWave, -30*dir, 18 + trailWave*0.6);
+  ctx.quadraticCurveTo(-14*dir, 10, -2*dir, 10);
+  ctx.closePath(); ctx.fill();
+
+  // tabla plana (surfboard) en vez de glider puntiagudo
+  ctx.fillStyle = '#c7d3da';
+  ctx.beginPath();
+  ctx.moveTo(-27, 17); ctx.quadraticCurveTo(0, 12, 27, 17);
+  ctx.quadraticCurveTo(0, 21, -27, 17);
+  ctx.fill();
+  ctx.strokeStyle = '#4dd0e1';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-27, 17); ctx.quadraticCurveTo(0, 12, 27, 17); ctx.stroke();
+
+  ctx.lineCap = 'round';
+
+  // piernas cromadas
+  ctx.strokeStyle = '#9fb0ba';
+  ctx.lineWidth = 5.5;
+  ctx.beginPath();
+  ctx.moveTo(0, 5); ctx.lineTo(-8*dir, 16);
+  ctx.moveTo(0, 5); ctx.lineTo(9*dir, 15);
+  ctx.stroke();
+
+  // torso cromado liso
+  const bodyGrad = ctx.createLinearGradient(-9, -15, 9, 9);
+  bodyGrad.addColorStop(0, '#e8f0f4');
+  bodyGrad.addColorStop(0.5, '#9fb4c0');
+  bodyGrad.addColorStop(1, '#5c7480');
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, -3, 9, 12, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // brazos abiertos, pose de vuelo
+  ctx.strokeStyle = '#a8b8c2';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(0, -7); ctx.lineTo(16*dir, -12);
+  ctx.moveTo(0, -7); ctx.lineTo(-15*dir, -1);
+  ctx.stroke();
+
+  // cabeza cromada, lisa y sin rasgos (sin máscara/orejas de duende)
+  const headGrad = ctx.createRadialGradient(-2, -22, 1, 0, -20, 9);
+  headGrad.addColorStop(0, '#f2f8fa');
+  headGrad.addColorStop(1, '#7f97a2');
+  ctx.fillStyle = headGrad;
+  ctx.beginPath(); ctx.ellipse(0, -20, 6.6, 8.2, 0, 0, Math.PI*2); ctx.fill();
+
+  // brillo azul cian en el reflejo de la cabeza, en vez de ojos
+  ctx.fillStyle = 'rgba(77,208,225,.75)';
+  ctx.shadowColor = '#4dd0e1';
+  ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.ellipse(-2.6*dir, -20.5, 2, 3, 0.3, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
 function drawEnemies(){
   const now = Date.now();
   for (const en of enemies){
@@ -3052,6 +3145,18 @@ function drawEnemies(){
     const dir = en.dir || -1; // mirando hacia atrás, de donde viene el jugador
     ctx.save();
     ctx.translate(sx, en.y);
+
+    if (en.style === 'torch'){
+      // aura cósmica azul/cian en vez de aura verde amenazante
+      const glowT = ctx.createRadialGradient(0,0,4,0,0,36);
+      glowT.addColorStop(0, 'rgba(77,208,225,.28)');
+      glowT.addColorStop(1, 'rgba(77,208,225,0)');
+      ctx.fillStyle = glowT;
+      ctx.beginPath(); ctx.arc(0,2,36,0,Math.PI*2); ctx.fill();
+      drawSilverSurferEnemy(en, dir, now);
+      ctx.restore();
+      continue;
+    }
 
     // aura amenazante
     const glow = ctx.createRadialGradient(0,0,4,0,0,36);
@@ -3145,6 +3250,73 @@ function drawEnemies(){
   }
 }
 
+// homenaje a Doctor Doom (estilo 'torch'): capucha verde, máscara metálica con
+// ranuras estrechas, y tendrils de energía mágica gruesos en vez de 4 brazos
+// mecánicos finos — misma pose/rango de trepada
+function drawDoomClimber(c, now){
+  const glow = ctx.createRadialGradient(0,0,4,0,0,34);
+  glow.addColorStop(0, 'rgba(90,255,120,.32)');
+  glow.addColorStop(1, 'rgba(90,255,120,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(0,0,34,0,Math.PI*2); ctx.fill();
+
+  // 2 tendrils gruesos de energía verde en vez de 4 brazos mecánicos finos
+  ctx.strokeStyle = '#4fe36a';
+  ctx.shadowColor = '#4fe36a'; ctx.shadowBlur = 6;
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  function drawTendril(shoulderX, shoulderY, dir, seed){
+    const wob = Math.sin(now/240 + seed) * 7;
+    const elbowX = shoulderX + dir*17, elbowY = shoulderY + wob*0.4;
+    const handX = elbowX + dir*14, handY = elbowY + 10 + wob*0.4;
+    ctx.beginPath();
+    ctx.moveTo(shoulderX, shoulderY);
+    ctx.quadraticCurveTo(elbowX, elbowY, handX, handY);
+    ctx.stroke();
+  }
+  drawTendril(-8, -6, -1, 0);
+  drawTendril(8, -6, 1, 3.1);
+  ctx.shadowBlur = 0;
+
+  // piernas cortas bajo el manto
+  ctx.strokeStyle = '#1c2e1e';
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.moveTo(-4, 11); ctx.lineTo(-8, 20);
+  ctx.moveTo(4, 11); ctx.lineTo(8, 20);
+  ctx.stroke();
+
+  // capucha/manto verde envolvente en vez de guardapolvo claro
+  ctx.fillStyle = '#1e5c2e';
+  ctx.beginPath(); ctx.ellipse(0, 1, 10, 14, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#123d1c';
+  ctx.beginPath();
+  ctx.moveTo(-4, -11); ctx.lineTo(0, -1); ctx.lineTo(4, -11);
+  ctx.lineTo(3, -12); ctx.lineTo(0, -5); ctx.lineTo(-3, -12);
+  ctx.closePath(); ctx.fill();
+
+  // capucha sobre la cabeza (en vez de mechones canosos)
+  ctx.fillStyle = '#1e5c2e';
+  ctx.beginPath();
+  ctx.moveTo(-8, -14); ctx.quadraticCurveTo(-9, -27, 0, -28);
+  ctx.quadraticCurveTo(9, -27, 8, -14);
+  ctx.quadraticCurveTo(0, -18, -8, -14);
+  ctx.closePath(); ctx.fill();
+
+  // máscara metálica gris con ranuras estrechas en los ojos (sin anteojos/lentes)
+  ctx.fillStyle = '#8a8f96';
+  ctx.beginPath(); ctx.ellipse(0, -18, 6.6, 7.2, 0, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#5c6066'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-6, -18); ctx.lineTo(6, -18); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(0, -12); ctx.stroke();
+  // ranuras de ojos brillantes
+  ctx.fillStyle = '#ffe066';
+  ctx.shadowColor = '#ffe066'; ctx.shadowBlur = 6;
+  ctx.beginPath(); ctx.ellipse(-3, -19, 2.2, 0.9, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(3, -19, 2.2, 0.9, 0, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
 function drawClimbers(){
   const now = Date.now();
   for (const c of climbers){
@@ -3153,6 +3325,12 @@ function drawClimbers(){
     ctx.save();
     ctx.translate(sx, c.y);
     ctx.scale(1.4, 1.4); // más grande, para que se note contra la fachada
+
+    if (c.style === 'torch'){
+      drawDoomClimber(c, now);
+      ctx.restore();
+      continue;
+    }
 
     // halo rojo de fondo, para que resalte contra edificios oscuros
     const glow = ctx.createRadialGradient(0,0,4,0,0,34);
@@ -3224,12 +3402,80 @@ function drawClimbers(){
   }
 }
 
+// homenaje al brazo de Galactus (estilo 'torch'): gauntlet cósmico púrpura/azul
+// con destellos de estrellas en vez de textura arenosa, descendiendo desde
+// arriba de la pantalla en vez de emerger del piso
+function drawGalactusArm(s, handH){
+  ctx.save();
+  ctx.translate(s.x - cameraX, -40);
+  const hf = s.heightFactor || 0;
+
+  // resplandor cósmico en la punta
+  ctx.fillStyle = `rgba(150,110,255,${0.2 + hf*0.25})`;
+  ctx.beginPath(); ctx.ellipse(0, -2, 46, 13, 0, 0, Math.PI*2); ctx.fill();
+
+  // antebrazo, gauntlet metálico púrpura/azul
+  const grad = ctx.createLinearGradient(0, 0, 0, handH);
+  grad.addColorStop(0, '#2a1f5c');
+  grad.addColorStop(1, '#6a4fd6');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(-17, -4); ctx.lineTo(-13, handH-28); ctx.lineTo(13, handH-28); ctx.lineTo(17, -4);
+  ctx.closePath(); ctx.fill();
+
+  // bandas de armadura (en vez de textura granulada de arena)
+  ctx.strokeStyle = 'rgba(180,150,255,.55)'; ctx.lineWidth = 2;
+  for (let b = 1; b <= 3; b++){
+    const by = 6 + (handH-40) * (b/4);
+    ctx.beginPath(); ctx.moveTo(-13 - b*0.3, by); ctx.lineTo(13 + b*0.3, by); ctx.stroke();
+  }
+
+  // destellos de estrellas/partículas cósmicas en vez del rostro tosco de arena
+  let seed = Math.floor(s.x) % 9973;
+  const rnd = () => { seed = (seed*9301 + 49297) % 233280; return seed/233280; };
+  ctx.fillStyle = `rgba(255,255,255,${0.5 + hf*0.4})`;
+  ctx.shadowColor = '#cbb6ff'; ctx.shadowBlur = 5;
+  for (let g = 0; g < 10; g++){
+    const gy = 4 + rnd()*(handH-30);
+    const gx = -13 + rnd()*26;
+    ctx.beginPath(); ctx.arc(gx, gy, 0.9 + rnd()*1.1, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+
+  // mano y dedos, gauntlet articulado
+  ctx.translate(0, handH - 28);
+  ctx.fillStyle = '#5539c2';
+  ctx.beginPath(); ctx.ellipse(0, -4, 22, 15, 0, 0, Math.PI*2); ctx.fill();
+  [-19, -8, 4, 15].forEach((fx, i) => {
+    const flen = 24 + (i === 1 || i === 2 ? 6 : 0);
+    ctx.beginPath();
+    ctx.ellipse(fx, flen/2 - 2, 6.5, flen/2, 0, 0, Math.PI*2);
+    ctx.fill();
+  });
+  // pequeños destellos de estrellas en los nudillos (en vez de grumos de arena)
+  ctx.fillStyle = 'rgba(255,255,255,.75)';
+  ctx.shadowColor = '#cbb6ff'; ctx.shadowBlur = 4;
+  [-19, -8, 4, 15].forEach((fx) => {
+    ctx.beginPath(); ctx.arc(fx + 2, 3, 1.6, 0, Math.PI*2); ctx.fill();
+  });
+  ctx.shadowBlur = 0;
+
+  ctx.restore();
+}
+
 function drawSandHands(){
   for (const s of sandHands){
     const hf = s.heightFactor || 0;
     if (hf < 0.03) continue; // escondida, no hace falta dibujarla
     const sx = s.x - cameraX;
     if (sx < -140 || sx > W + 140) continue;
+
+    if (s.style === 'torch'){
+      const handH = (s.topY - (-40)) + 30; // profundidad alcanzada desde el borde superior
+      drawGalactusArm(s, handH);
+      continue;
+    }
+
     const handH = (groundY - s.topY) + 30;
 
     ctx.save();
@@ -3288,6 +3534,62 @@ function drawSandHands(){
   }
 }
 
+// homenaje a Mole Man (estilo 'torch'): figura humanoide baja y fornida, con
+// capucha/manto y anteojos brillantes, en vez de la bestia grande tipo rinoceronte
+// — mismos puffs de polvo/rocas bajo los pies, como guiño a su tema de túneles
+function drawMoleManRhino(r, now){
+  const legPhase = Math.sin(now/70 + r.x*0.05);
+
+  // puffs de polvo/rocas bajo los pies (decorativo, guiño a su temática de tunelero)
+  ctx.fillStyle = 'rgba(120,90,70,.35)';
+  ctx.beginPath(); ctx.ellipse(-10, -3, 16, 6, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(90,70,55,.4)';
+  [-16, -6, 3].forEach((fx, i) => {
+    ctx.beginPath(); ctx.arc(fx, -2 - Math.abs(Math.sin(now/90+i))*3, 2.4, 0, Math.PI*2); ctx.fill();
+  });
+
+  // piernas cortas
+  ctx.strokeStyle = '#2a1f38';
+  ctx.lineWidth = 6.5; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-6, -8); ctx.lineTo(-6 + legPhase*6, 2);
+  ctx.moveTo(6, -8); ctx.lineTo(6 - legPhase*6, 2);
+  ctx.stroke();
+
+  // manto/túnica púrpura-tierra, figura baja y fornida
+  ctx.fillStyle = '#4a3560';
+  ctx.beginPath();
+  ctx.moveTo(-16, -10); ctx.quadraticCurveTo(-18, -34, 0, -38);
+  ctx.quadraticCurveTo(18, -34, 16, -10);
+  ctx.quadraticCurveTo(0, -4, -16, -10);
+  ctx.closePath(); ctx.fill();
+  // banda de tierra/tono terroso al frente del manto
+  ctx.fillStyle = '#6b4a35';
+  ctx.beginPath();
+  ctx.ellipse(0, -12, 9, 14, 0, 0, Math.PI*2); ctx.fill();
+
+  // capucha sobre la cabeza
+  ctx.fillStyle = '#3a2a50';
+  ctx.beginPath();
+  ctx.moveTo(-11, -30); ctx.quadraticCurveTo(-12, -46, 0, -48);
+  ctx.quadraticCurveTo(12, -46, 11, -30);
+  ctx.quadraticCurveTo(0, -35, -11, -30);
+  ctx.closePath(); ctx.fill();
+
+  // rostro en sombra bajo la capucha
+  ctx.fillStyle = '#2a1f38';
+  ctx.beginPath(); ctx.ellipse(0, -33, 6.5, 6, 0, 0, Math.PI*2); ctx.fill();
+
+  // anteojos/goggles brillantes (en vez de ojo entrecerrado)
+  ctx.fillStyle = '#8aff6a';
+  ctx.shadowColor = '#8aff6a'; ctx.shadowBlur = 7;
+  ctx.beginPath(); ctx.ellipse(-3, -33, 2.6, 1.8, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(3, -33, 2.6, 1.8, 0, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = '#1a1424'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(-0.6, -33); ctx.lineTo(0.6, -33); ctx.stroke();
+}
+
 function drawRhinos(){
   const now = Date.now();
   for (const r of rhinos){
@@ -3295,6 +3597,12 @@ function drawRhinos(){
     if (sx < -60 || sx > W + 60) continue;
     ctx.save();
     ctx.translate(sx, groundY);
+
+    if (r.style === 'torch'){
+      drawMoleManRhino(r, now);
+      ctx.restore();
+      continue;
+    }
 
     // polvo levantado al correr
     ctx.fillStyle = 'rgba(160,150,140,.3)';
@@ -3358,6 +3666,59 @@ function drawRhinos(){
   }
 }
 
+// homenaje a Blastaar (estilo 'torch'): guerrero alienígena rojo/negro fornido
+// con un solo gran guantelete de garra, en vez del escorpión insectoide —
+// misma pose agazapada en el techo, mismo aguijón/cola que carga antes de disparar
+function drawBlastaarScorpion(s, now, chargeUp){
+  // patas cortas y fornidas
+  const legTwitch = Math.sin(now/260 + s.x*0.02) * 1.2;
+  ctx.strokeStyle = '#1a0f0f'; ctx.lineWidth = 3.4; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-6, 4); ctx.lineTo(-11, 9 + legTwitch);
+  ctx.moveTo(6, 4); ctx.lineTo(11, 9 - legTwitch);
+  ctx.stroke();
+
+  // torso musculoso rojo/negro
+  ctx.fillStyle = '#7a1414';
+  ctx.beginPath(); ctx.ellipse(0, -2, 12, 11, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#1a0f0f';
+  ctx.beginPath(); ctx.moveTo(-8, -8); ctx.lineTo(8, -8); ctx.lineTo(5, 4); ctx.lineTo(-5, 4); ctx.closePath(); ctx.fill();
+
+  // brazo/guantelete pequeño (lado sin garra)
+  ctx.strokeStyle = '#7a1414'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(7, -4); ctx.lineTo(14, -2); ctx.stroke();
+
+  // gran guantelete con garra al frente (rasgo distintivo, en vez de las pinzas del escorpión)
+  ctx.strokeStyle = '#5c0f0f'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-7, -3); ctx.lineTo(-19, -6); ctx.stroke();
+  ctx.fillStyle = '#2a1a1a';
+  ctx.beginPath(); ctx.ellipse(-22, -6, 6.5, 5, 0.2, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#2a1a1a'; ctx.lineWidth = 2.2;
+  [-1, 0, 1].forEach(k => {
+    ctx.beginPath(); ctx.moveTo(-24, -6); ctx.lineTo(-30, -8 + k*4); ctx.stroke();
+  });
+
+  // cola curva sobre el hombro con aguijón de energía (misma pose que el escorpión)
+  ctx.strokeStyle = '#5c0f0f';
+  ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-2, -6);
+  ctx.quadraticCurveTo(-14, -12, -11, -25);
+  ctx.quadraticCurveTo(-7, -32, 2, -30);
+  ctx.stroke();
+  ctx.fillStyle = chargeUp > 0.5 ? '#ffb347' : '#a8442a';
+  if (chargeUp > 0.5){ ctx.shadowColor = '#ff8c3c'; ctx.shadowBlur = 9; }
+  ctx.beginPath(); ctx.ellipse(2, -30, 4.2, 3.2, 0, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // ojos alienígenas anaranjados
+  ctx.fillStyle = '#ff8c3c';
+  ctx.shadowColor = '#ff8c3c'; ctx.shadowBlur = 5;
+  ctx.beginPath(); ctx.ellipse(-3, -4, 1.8, 1.4, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(3, -4, 1.8, 1.4, 0, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
 function drawScorpions(){
   const now = Date.now();
   for (const s of scorpions){
@@ -3366,6 +3727,12 @@ function drawScorpions(){
     const chargeUp = Math.max(0, 1 - s.cooldown / 30); // brilla más cerca de disparar
     ctx.save();
     ctx.translate(sx, s.y);
+
+    if (s.style === 'torch'){
+      drawBlastaarScorpion(s, now, chargeUp);
+      ctx.restore();
+      continue;
+    }
 
     // patas segmentadas cortas a los costados (insecto agazapado sobre el techo)
     const legTwitch = Math.sin(now/260 + s.x*0.02) * 1.4;
@@ -3428,13 +3795,24 @@ function drawPoisonBolts(){
     if (sx < -20 || sx > W + 20) continue;
     ctx.save();
     ctx.translate(sx, sy);
-    const glow = ctx.createRadialGradient(0,0,1,0,0,10);
-    glow.addColorStop(0, 'rgba(138,255,106,.9)');
-    glow.addColorStop(1, 'rgba(138,255,106,0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#8aff6a';
-    ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fill();
+    if (p.style === 'torch'){
+      // proyectil de energía naranja/rojo de Blastaar, en vez del veneno verde
+      const glowT = ctx.createRadialGradient(0,0,1,0,0,10);
+      glowT.addColorStop(0, 'rgba(255,140,60,.9)');
+      glowT.addColorStop(1, 'rgba(255,140,60,0)');
+      ctx.fillStyle = glowT;
+      ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ff6a3c';
+      ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fill();
+    } else {
+      const glow = ctx.createRadialGradient(0,0,1,0,0,10);
+      glow.addColorStop(0, 'rgba(138,255,106,.9)');
+      glow.addColorStop(1, 'rgba(138,255,106,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#8aff6a';
+      ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fill();
+    }
     ctx.restore();
   }
 }
