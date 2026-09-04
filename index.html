@@ -208,6 +208,71 @@
     box-shadow: 0 4px 14px rgba(0,0,0,.5); flex-shrink: 0;
   }
 
+  #historyBtn {
+    background: transparent; color: #7dd6ff; border: 2px solid #7dd6ff;
+    padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
+    cursor: pointer; margin-top: 10px;
+  }
+  #historyOverlay {
+    position: fixed; inset: 0; background: rgba(6,4,14,.97); z-index: 6;
+    display: none; flex-direction: column; align-items: center;
+    padding: 36px 20px 24px; overflow-y: auto; color: #fff; text-align: center;
+    touch-action: pan-y; -webkit-overflow-scrolling: touch;
+  }
+  #historyOverlay.show { display: flex; }
+  #historyOverlay h2 { font-size: 26px; margin: 0 0 4px; }
+  #historyOverlay .ach-sub { color: #999; font-size: 13px; margin-bottom: 18px; }
+  #historyList { max-width: 440px; width: 100%; text-align: left; }
+  .hist-row {
+    display: flex; gap: 12px; align-items: center; padding: 9px 10px;
+    border-radius: 10px; background: rgba(255,255,255,.04); margin-bottom: 6px;
+  }
+  .hist-icon { font-size: 20px; flex-shrink: 0; }
+  .hist-dist { font-size: 14px; font-weight: 700; }
+  .hist-meta { font-size: 12px; color: #aaa; }
+  .hist-empty { color: #999; font-size: 13px; margin-top: 20px; }
+  #closeHistory {
+    position: sticky; bottom: 6px; margin-top: 14px; background: #7dd6ff; color: #002233;
+    border: none; padding: 11px 30px; border-radius: 24px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5); flex-shrink: 0;
+  }
+
+  #settingsBtn {
+    background: transparent; color: #b7b7c2; border: 2px solid #b7b7c2;
+    padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
+    cursor: pointer; margin-top: 10px;
+  }
+  #settingsOverlay {
+    position: fixed; inset: 0; background: rgba(6,4,14,.97); z-index: 6;
+    display: none; flex-direction: column; align-items: center;
+    padding: 36px 20px 24px; overflow-y: auto; color: #fff; text-align: center;
+    touch-action: pan-y; -webkit-overflow-scrolling: touch;
+  }
+  #settingsOverlay.show { display: flex; }
+  #settingsOverlay h2 { font-size: 26px; margin: 0 0 18px; }
+  #settingsList { max-width: 380px; width: 100%; text-align: left; }
+  .setting-row {
+    display: flex; gap: 12px; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,.05); margin-bottom: 10px;
+  }
+  .setting-label { font-size: 15px; font-weight: 700; }
+  .setting-sub { font-size: 12px; color: #999; margin-top: 2px; }
+  .setting-toggle {
+    width: 46px; height: 26px; border-radius: 14px; background: #444; position: relative;
+    cursor: pointer; flex-shrink: 0; border: none; padding: 0;
+  }
+  .setting-toggle.on { background: #4caf7d; }
+  .setting-toggle .knob {
+    position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; transition: left .15s ease;
+  }
+  .setting-toggle.on .knob { left: 23px; }
+  #closeSettings {
+    position: sticky; bottom: 6px; margin-top: 14px; background: #b7b7c2; color: #1a1a20;
+    border: none; padding: 11px 30px; border-radius: 24px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5); flex-shrink: 0;
+  }
+
   #instructionsBtn {
     background: transparent; color: #4dd0e1; border: 2px solid #4dd0e1;
     padding: 9px 24px; font-size: 14px; font-weight: 700; border-radius: 24px;
@@ -251,6 +316,18 @@
     white-space: nowrap;
   }
   #achievementToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #tutorialBanner {
+    position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 8;
+    background: rgba(10,8,20,.92); border: 2px solid #4dd0e1; color: #fff;
+    padding: 10px 16px; border-radius: 14px; font-size: 13px; font-weight: 600;
+    max-width: min(92vw, 460px); text-align: center; box-shadow: 0 8px 20px rgba(0,0,0,.4);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  #tutorialText { line-height: 1.4; }
+  #tutorialSkipBtn {
+    background: transparent; color: #4dd0e1; border: 1px solid #4dd0e1;
+    padding: 5px 14px; font-size: 11px; font-weight: 700; border-radius: 14px; cursor: pointer;
+  }
   #pauseOverlay {
     position: fixed; inset: 0; background: rgba(6,4,14,.85); z-index: 7;
     display: none; align-items: center; justify-content: center; flex-direction: column;
@@ -275,7 +352,6 @@
   <span>🏙 <span id="score">0</span> m</span>
   <span>🏆 <span id="best">0</span> m</span>
   <span id="lifeIndicator" style="display:none">❤️</span>
-  <span id="flowIndicator" style="display:none"></span>
   <span id="autoShootIndicator" style="display:none">🕸️ 0s</span>
   <span id="soloTorchEnergyIndicator" style="display:none">🔥 <span id="soloTorchEnergyValue">100</span>%</span>
 </div>
@@ -283,14 +359,20 @@
   <span>🔥 Antorcha: <span id="torchEnergy">100</span>%</span>
   <span id="torchLifeIndicator" style="display:none">❤️</span>
   <span id="torchAutoShootIndicator" style="display:none">🔥 0s</span>
+  <span id="reviveIndicator">🔁 <span id="reviveCountLeft">3</span>/3</span>
 </div>
 <button id="pauseBtn">⏸</button>
 <div id="achievementToast"></div>
+<div id="tutorialBanner" style="display:none">
+  <div id="tutorialText"></div>
+  <button id="tutorialSkipBtn">Salir del tutorial</button>
+</div>
 
 <div id="pauseOverlay">
   <h2>⏸ Pausa</h2>
   <button id="resumeBtn">Continuar</button>
   <button id="restartFromPauseBtn">Reiniciar</button>
+  <button id="settingsFromPauseBtn">⚙️ Ajustes</button>
   <button id="menuBtn">Menú principal</button>
 </div>
 
@@ -310,7 +392,10 @@
     <div id="homeRecords" class="home-records"></div>
     <button id="goPlayBtn" class="menu-primary-btn">▶️ Jugar</button>
     <button id="achievementsBtn" class="menu-secondary-btn">🏆 Logros</button>
+    <button id="historyBtn" class="menu-secondary-btn">📜 Historial</button>
+    <button id="tutorialBtn" class="menu-secondary-btn">🎓 Tutorial</button>
     <button id="instructionsBtn" class="menu-secondary-btn">📖 ¿Cómo se juega?</button>
+    <button id="settingsBtn" class="menu-secondary-btn">⚙️ Ajustes</button>
   </div>
 
   <div id="modeMenu" class="menu-screen" style="display:none">
@@ -351,6 +436,24 @@
     <button type="button" class="menu-back-btn" data-back="modeMenu">← Volver</button>
   </div>
 
+  <div id="tutorialPickMenu" class="menu-screen" style="display:none">
+    <h2>🎓 Tutorial</h2>
+    <div class="menu-subtitle">Elegí con quién querés practicar</div>
+    <div class="char-cards">
+      <div class="char-card" id="tutorialSpidermanCard" data-char="spiderman">
+        <div class="char-card-icon">🕷️</div>
+        <div class="char-card-title">Spiderman</div>
+        <div class="char-card-sub">Telaraña y swing</div>
+      </div>
+      <div class="char-card" id="tutorialTorchCard" data-char="torch">
+        <div class="char-card-icon">🔥</div>
+        <div class="char-card-title">Antorcha Humana</div>
+        <div class="char-card-sub">Vuelo a impulsos</div>
+      </div>
+    </div>
+    <button type="button" class="menu-back-btn" data-back="homeMenu">← Volver</button>
+  </div>
+
   <div id="duoSetupMenu" class="menu-screen" style="display:none">
     <h2>🤝 2 Jugadores</h2>
     <div class="menu-subtitle">Local, en el mismo teclado</div>
@@ -378,6 +481,28 @@
   <button id="closeAchievements">Volver</button>
 </div>
 
+<div id="historyOverlay">
+  <h2>📜 Historial de partidas</h2>
+  <div class="ach-sub">Tus últimas partidas en este dispositivo</div>
+  <div id="historyList"></div>
+  <button id="closeHistory">Volver</button>
+</div>
+
+<div id="settingsOverlay">
+  <h2>⚙️ Ajustes</h2>
+  <div id="settingsList">
+    <div class="setting-row">
+      <div><div class="setting-label">🔊 Sonido</div><div class="setting-sub">Efectos de swing, impulso, power-ups, logros y más</div></div>
+      <button type="button" class="setting-toggle" id="soundToggle"><span class="knob"></span></button>
+    </div>
+    <div class="setting-row">
+      <div><div class="setting-label">📳 Vibración</div><div class="setting-sub">Solo en mobile: golpes, power-ups, logros y revivir</div></div>
+      <button type="button" class="setting-toggle" id="vibrationToggle"><span class="knob"></span></button>
+    </div>
+  </div>
+  <button id="closeSettings">Volver</button>
+</div>
+
 <div id="instructionsOverlay">
   <h2>📖 Instrucciones</h2>
   <div id="instructionsList">
@@ -398,10 +523,6 @@
       <div><div class="instr-name">Largo de la telaraña</div><div class="instr-desc">Colgado, arrastrá el dedo hacia arriba para alargar la telaraña o hacia abajo para acortarla. En PC, usá la ruedita del mouse (arriba alarga, abajo achica).</div></div>
     </div>
     <div class="instr-row">
-      <span class="instr-icon">🔥</span>
-      <div><div class="instr-name">Racha de vuelo</div><div class="instr-desc">Si soltás la telaraña rápido después de engancharte (en vez de quedarte todo el balanceo colgado) y avanzaste bastante, sumás racha y te da un empujón extra hacia arriba. Encadenar sueltas rápidas te va llevando cada vez más alto, lejos de la calle. Un balanceo largo corta la racha.</div></div>
-    </div>
-    <div class="instr-row">
       <span class="instr-icon">🏙️</span>
       <div><div class="instr-name">Nueva York</div><div class="instr-desc">La ciudad tiene edificios comunes, pero cada tanto te vas a cruzar con algo temático — referencias al Empire State, al One World Trade Center y a Times Square, con su fachada llena de carteles de neón.</div></div>
     </div>
@@ -415,7 +536,7 @@
     </div>
     <div class="instr-row">
       <span class="instr-icon">🚀</span>
-      <div><div class="instr-name">Power-up: Súper salto</div><div class="instr-desc">Te da un impulso hacia arriba y adelante para cubrir varios metros de una. En modo 2 jugadores lo puede agarrar cualquiera de los dos, pero se activa para Spiderman y la Antorcha al mismo tiempo — no hace falta que lo agarren los dos por separado.</div></div>
+      <div><div class="instr-name">Power-up: Súper salto</div><div class="instr-desc">Le da a Spiderman un impulso hacia arriba y adelante para cubrir varios metros de una. A la Antorcha Humana la afecta distinto: le activa un propulsor que la hace avanzar sola para adelante durante un par de segundos — si apretás el impulso (Espacio o toque) mientras dura, lo cortás ahí mismo. En modo 2 jugadores lo puede agarrar cualquiera de los dos, pero se activa para Spiderman y la Antorcha al mismo tiempo — no hace falta que lo agarren los dos por separado.</div></div>
     </div>
     <div class="instr-row">
       <span class="instr-icon">🕸️</span>
@@ -479,7 +600,7 @@
     </div>
     <div class="instr-row">
       <span class="instr-icon">🔥</span>
-      <div><div class="instr-name">Modo 2 jugadores (solo PC)</div><div class="instr-desc">Elegí la tarjeta "2 Jugadores" en el menú para jugar Spiderman + Antorcha Humana en el mismo teclado. Spiderman se mueve con <strong>WASD</strong> y sigue apuntando/tirando la telaraña con el mouse. La Antorcha se impulsa con <strong>Espacio</strong>: cada apretada da un empujón hacia arriba de una sola vez (no continuo), gasta energía, y si en ese momento tenés apretada una <strong>flecha izquierda/derecha</strong> el impulso sale con una leve inclinación hacia ese lado — las flechas solas ya no la mueven. La llamita 🔥 le recarga la energía. Si uno de los dos muere, el otro sigue solo y aparece un power-up para revivirlo (🔥 si murió la Antorcha, 🕸️ si murió Spiderman): tiene un "imán" que lo va acercando solo si pasás cerca, con un radio bien generoso para agarrarlo sin puntería fina. La partida termina recién cuando mueren los dos.</div></div>
+      <div><div class="instr-name">Modo 2 jugadores (solo PC)</div><div class="instr-desc">Elegí la tarjeta "2 Jugadores" en el menú para jugar Spiderman + Antorcha Humana en el mismo teclado. Spiderman se mueve con <strong>WASD</strong> y sigue apuntando/tirando la telaraña con el mouse. La Antorcha se impulsa con <strong>Espacio</strong>: cada apretada da un empujón hacia arriba de una sola vez (no continuo), gasta energía, y si en ese momento tenés apretada una <strong>flecha izquierda/derecha</strong> el impulso sale con una leve inclinación hacia ese lado — las flechas solas ya no la mueven. La llamita 🔥 le recarga la energía. Si uno de los dos muere, el otro sigue solo y aparece un power-up para revivirlo (🔥 si murió la Antorcha, 🕸️ si murió Spiderman): tiene un "imán" que lo va acercando solo si pasás cerca, con un radio bien generoso para agarrarlo sin puntería fina. Ojo: solo hay 3 revives por partida entre los dos personajes (se ve el contador en el HUD) — al agotarse, la próxima muerte ya no tiene vuelta atrás. La partida termina cuando mueren los dos, o cuando el que queda vivo también muere sin revives disponibles.</div></div>
     </div>
   </div>
   <button id="closeInstructions">Volver</button>
@@ -527,13 +648,7 @@ const AIR_CONTROL = 0.34;
 const MAX_WEB = 520;
 const JUMP_VY = -12;
 const AUTO_SHOOT_DURATION = 300; // ~5s a 60fps
-// racha de vuelo: premia soltar la telaraña rápido en vez de quedarte todo el
-// péndulo colgado — encadenar sueltas rápidas te va empujando cada vez más alto
-const FAST_SWING_FRAMES = 20;   // soltar antes de esto cuenta como "rápido"
-const MIN_FLOW_DISTANCE = 35;   // tenés que haber avanzado esto como mínimo
-const FLOW_BOOST_PER_COMBO = 3.4;
-const BASE_RELEASE_LIFT = 2.2; // empuje parejo en cada suelta, tengas racha o no
-const MAX_FLOW_COMBO = 6;
+const BASE_RELEASE_LIFT = 2.2; // empuje parejo en cada suelta al soltar la telaraña
 const AUTO_SHOOT_COOLDOWN = 24;  // frames entre disparo y disparo
 
 // ---------- modo 2 jugadores (Antorcha Humana, solo PC) ----------
@@ -558,11 +673,72 @@ const SOLO_TORCH_SPEED_GROWTH = 0.0018; // cuánto acelera por cada metro de pro
 const TORCH_BOOST_SPEED = 7.5;   // velocidad extra hacia adelante mientras dura el propulsor
 const TORCH_BOOST_DURATION = 100; // frames que dura el propulsor si no lo cortás antes (~1.7s)
 
+const MATCH_REVIVE_LIMIT = 3; // revives totales por partida en 2P, combinados entre los dos personajes
+let matchReviveUsed = 0;
+
+// ---------- tutorial interactivo ----------
+// tutorialMode: null (partida normal) | 'spiderman' | 'torch'. Mientras está
+// activo no aparece ningún enemigo y tocar el piso no cuenta como muerte, para
+// que se pueda practicar tranquilo. Los pasos avanzan solos al detectar la
+// acción pedida, con un límite de tiempo por las dudas para que nunca se trabe.
+let tutorialMode = null;
+let tutorialStepIndex = 0;
+let tutorialStepStartFrame = 0;
+let tutorialImpulseCount = 0;
+const TUTORIAL_STEP_TIMEOUT = 900; // ~15s: si no se detecta la acción, avanza igual
+const TUTORIAL_STEPS = {
+  spiderman: [
+    '🕸️ Tocá la pantalla (o hacé click) apuntando a un edificio para tirar la telaraña y engancharte.',
+    '🤏 Soltá el dedo/click para largar la telaraña y salir volando con el impulso que traías.',
+    '🔁 Ahora enganchate de nuevo en otro edificio para encadenar el vuelo — así se juega todo el tiempo.',
+    '🎉 ¡Listo! Ya sabés jugar con Spiderman. Salí cuando quieras para ir a una partida de verdad.'
+  ],
+  torch: [
+    '🚀 Apretá Espacio (o tocá la pantalla) para darle un impulso hacia arriba a la Antorcha.',
+    '🔋 Cada impulso gasta energía — dosificalos, no hace falta mantenerlos ni apretar todo el tiempo.',
+    '🔥 Buscá la llamita para recargar tu energía cuando se te esté por acabar.',
+    '🎉 ¡Listo! Ya sabés volar con la Antorcha Humana. Salí cuando quieras para ir a una partida de verdad.'
+  ]
+};
+function startTutorial(character){
+  tutorialMode = character;
+  twoPlayerMode = false;
+  soloCharacter = character;
+  tutorialStepIndex = 0;
+  tutorialImpulseCount = 0;
+  beginGame();
+  tutorialStepStartFrame = elapsedFrames;
+  updateTutorialBanner();
+}
+function advanceTutorialStep(){
+  if (!tutorialMode) return;
+  const steps = TUTORIAL_STEPS[tutorialMode];
+  if (tutorialStepIndex < steps.length - 1){
+    tutorialStepIndex++;
+    tutorialStepStartFrame = elapsedFrames;
+    updateTutorialBanner();
+  }
+}
+function updateTutorialBanner(){
+  const banner = document.getElementById('tutorialBanner');
+  const text = document.getElementById('tutorialText');
+  if (!banner || !text) return;
+  if (!tutorialMode){ banner.style.display = 'none'; return; }
+  banner.style.display = 'flex';
+  text.textContent = TUTORIAL_STEPS[tutorialMode][tutorialStepIndex];
+}
+function exitTutorial(){
+  tutorialMode = null;
+  document.getElementById('tutorialBanner').style.display = 'none';
+  showMenu();
+}
+
 let groundY, cameraX, buildings, powerUps, enemies, climbers, sandHands, rhinos, scorpions, poisonBolts, helicopters, webShots, player, web, keys, score, best = 0, running = false, gameOver = false;
 // vida callejera decorativa (no interfiere con la jugabilidad): árboles, gente paseando, autos
 let trees, pedestrians, cars;
 const CAR_COLORS = ['#c94b4b', '#3f6fb0', '#d9b23a', '#5a5a62', '#4a8f5c', '#c7c7cf'];
 let startBuilding, canLand, pickupMsg = null, pumpVel = 0, sessionMaxHeightPx = 0, paused = false, progressM = 0;
+let difficultyMultiplier = 1, difficultyProgressM = 0; // dificultad adaptativa según el historial reciente
 let deathTitle = '💥 Tocaste el piso';
 let elapsedFrames = 0;
 let missMarker = null, webThrow = null;
@@ -614,9 +790,85 @@ function showMenuScreen(id){
 document.getElementById('goPlayBtn').addEventListener('click', () => showMenuScreen('modeMenu'));
 document.getElementById('pick1PBtn').addEventListener('click', () => showMenuScreen('soloSetupMenu'));
 document.getElementById('pick2PBtn').addEventListener('click', () => showMenuScreen('duoSetupMenu'));
+document.getElementById('tutorialBtn').addEventListener('click', () => showMenuScreen('tutorialPickMenu'));
+document.getElementById('tutorialSpidermanCard').addEventListener('click', () => startTutorial('spiderman'));
+document.getElementById('tutorialTorchCard').addEventListener('click', () => startTutorial('torch'));
+document.getElementById('tutorialSkipBtn').addEventListener('click', exitTutorial);
 document.querySelectorAll('.menu-back-btn').forEach(b => {
   b.addEventListener('click', () => showMenuScreen(b.dataset.back));
 });
+
+// ---------- ajustes (sonido / vibración), persistidos aparte de las stats ----------
+let settings = { soundOn: true, vibrationOn: true };
+function loadSettings(){
+  try {
+    const raw = localStorage.getItem('trepamuros_settings');
+    if (raw) settings = Object.assign(settings, JSON.parse(raw));
+  } catch (e) { /* almacenamiento local no disponible en este entorno */ }
+}
+function saveSettings(){
+  try { localStorage.setItem('trepamuros_settings', JSON.stringify(settings)); }
+  catch (e) { /* nada que hacer si no se puede guardar */ }
+}
+loadSettings();
+
+// vibración háptica: pulsos cortos en momentos clave (golpe/muerte, agarrar
+// power-up, logro, revivir). Se apaga con el toggle de ajustes y no rompe nada
+// en dispositivos/navegadores que no soportan navigator.vibrate
+function vibrate(pattern){
+  if (!settings.vibrationOn) return;
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* ignorar */ }
+}
+
+// ---------- sonido (sintetizado con Web Audio API, sin archivos externos) ----------
+// el AudioContext hay que crearlo/despertarlo como reacción directa a un gesto
+// del jugador (click/touch) — los navegadores lo bloquean si no
+let audioCtx = null;
+function ensureAudioCtx(){
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) { /* Web Audio no disponible en este entorno */ }
+  return audioCtx;
+}
+const SFX_PRESETS = {
+  powerup:     { freq: 520, end: 900,  dur: 0.18, type: 'triangle', gain: 0.18 },
+  bounce:      { freq: 300, end: 500,  dur: 0.15, type: 'square',   gain: 0.16 },
+  death:       { freq: 220, end: 60,   dur: 0.40, type: 'sawtooth', gain: 0.20 },
+  revive:      { freq: 400, end: 760,  dur: 0.35, type: 'triangle', gain: 0.20 },
+  achievement: { freq: 600, end: 1100, dur: 0.30, type: 'sine',     gain: 0.20 },
+  swing:       { freq: 340, end: 200,  dur: 0.09, type: 'sine',     gain: 0.10 },
+  impulse:     { freq: 250, end: 480,  dur: 0.12, type: 'square',   gain: 0.14 },
+  click:       { freq: 500, end: 480,  dur: 0.05, type: 'square',   gain: 0.06 },
+  start:       { freq: 300, end: 700,  dur: 0.25, type: 'triangle', gain: 0.18 },
+};
+function playSfx(name){
+  if (!settings.soundOn) return;
+  const ctx = ensureAudioCtx();
+  if (!ctx) return;
+  try {
+    const p = SFX_PRESETS[name] || SFX_PRESETS.click;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    osc.type = p.type;
+    osc.frequency.setValueAtTime(p.freq, now);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(30, p.end), now + p.dur);
+    gainNode.gain.setValueAtTime(p.gain, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + p.dur);
+    osc.connect(gainNode).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + p.dur + 0.02);
+  } catch (e) { /* si algo falla, seguimos sin sonido en vez de romper el juego */ }
+}
+// feedback sonoro genérico para cualquier botón del menú/HUD (delegado, así
+// cubre también los botones que se agreguen más adelante sin cablear cada uno)
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.closest && e.target.closest('button')){
+    ensureAudioCtx();
+    playSfx('click');
+  }
+}, true);
 
 // ---------- selector de personaje (solo 1 jugador, mobile y PC) ----------
 function renderCharacterPicker(){
@@ -650,8 +902,9 @@ let stats = {
   enemiesDefeated: 0, totalDayCycles: 0, enemyTypesSeen: [],
   landmarkCounts: { empire: 0, wtc: 0, times: 0 }, unlockedIds: [],
   bestDistanceSpiderman: 0, bestDistanceTorch: 0,
-  torchEnemyTypesSeen: [], reviveCount: 0
+  torchEnemyTypesSeen: [], reviveCount: 0, matchHistory: []
 };
+const MATCH_HISTORY_LIMIT = 20; // cuántas partidas recientes se guardan en el historial
 
 function loadStats(){
   try {
@@ -661,6 +914,7 @@ function loadStats(){
   if (!stats.unlockedIds) stats.unlockedIds = [];
   if (!stats.torchEnemyTypesSeen) stats.torchEnemyTypesSeen = [];
   if (!stats.reviveCount) stats.reviveCount = 0;
+  if (!stats.matchHistory) stats.matchHistory = [];
   // migración: los saves viejos tenían un único stats.bestDistance (de antes de
   // que existiera el modo Antorcha) — se convierte una sola vez en el récord de
   // Spiderman, ya que históricamente era el único personaje jugable
@@ -718,6 +972,8 @@ function processAchievementToastQueue(){
   const el = document.getElementById('achievementToast');
   el.innerHTML = '🏅 Logro desbloqueado: <strong>' + a.name + '</strong>';
   el.classList.add('show');
+  vibrate([20, 30, 20, 30, 45]);
+  playSfx('achievement');
   setTimeout(() => {
     el.classList.remove('show');
     setTimeout(() => { achievementToastBusy = false; processAchievementToastQueue(); }, 300);
@@ -810,6 +1066,42 @@ document.getElementById('achievementsBtn').addEventListener('click', () => {
 document.getElementById('closeAchievements').addEventListener('click', () => {
   document.getElementById('achievementsOverlay').classList.remove('show');
 });
+document.getElementById('historyBtn').addEventListener('click', () => {
+  renderHistory();
+  document.getElementById('historyOverlay').classList.add('show');
+});
+document.getElementById('closeHistory').addEventListener('click', () => {
+  document.getElementById('historyOverlay').classList.remove('show');
+});
+
+// ---------- pantalla de ajustes ----------
+function renderSettings(){
+  const soundEl = document.getElementById('soundToggle');
+  const vibEl = document.getElementById('vibrationToggle');
+  if (soundEl) soundEl.classList.toggle('on', settings.soundOn);
+  if (vibEl) vibEl.classList.toggle('on', settings.vibrationOn);
+}
+document.getElementById('soundToggle').addEventListener('click', () => {
+  settings.soundOn = !settings.soundOn;
+  saveSettings();
+  renderSettings();
+  if (settings.soundOn){ ensureAudioCtx(); playSfx('click'); }
+});
+document.getElementById('vibrationToggle').addEventListener('click', () => {
+  settings.vibrationOn = !settings.vibrationOn;
+  saveSettings();
+  renderSettings();
+  if (settings.vibrationOn) vibrate(20);
+});
+function openSettings(){
+  renderSettings();
+  document.getElementById('settingsOverlay').classList.add('show');
+}
+document.getElementById('settingsBtn').addEventListener('click', openSettings);
+document.getElementById('settingsFromPauseBtn').addEventListener('click', openSettings);
+document.getElementById('closeSettings').addEventListener('click', () => {
+  document.getElementById('settingsOverlay').classList.remove('show');
+});
 document.getElementById('instructionsBtn').addEventListener('click', () => {
   document.getElementById('instructionsOverlay').classList.add('show');
 });
@@ -897,6 +1189,8 @@ function initGame(){
   // se reseteaba acá, así que una partida nueva heredaba el progreso (y por lo
   // tanto la dificultad ya avanzada) de la mejor/última corrida de la sesión
   progressM = 0;
+  difficultyMultiplier = computeDifficultyMultiplier();
+  difficultyProgressM = 0;
 
   if (!stats.skinsUsed.includes(SKINS[selectedSkin].id)){
     stats.skinsUsed.push(SKINS[selectedSkin].id);
@@ -921,7 +1215,7 @@ function initGame(){
   canLand = true;
   player = {
     x: first.x + first.width/2, y: groundY - first.height - 14,
-    px: 0, py: 0, radius: 14, grounded: true, facing: 1, autoShoot: false, autoShootTimer: 0, shootCooldown: 0, extraLives: 0, riding: null, flowCombo: 0, attachFrame: 0, attachX: 0, alive: true
+    px: 0, py: 0, radius: 14, grounded: true, facing: 1, autoShoot: false, autoShootTimer: 0, shootCooldown: 0, extraLives: 0, riding: null, alive: true
   };
   player.px = player.x; player.py = player.y;
 
@@ -939,6 +1233,8 @@ function initGame(){
   torchCruiseSpeed = 0;
   lastPlayerVX = 0;
   torchTrail = []; // estela de fuego/humo que va dejando al volar
+  matchReviveUsed = 0;
+  updateReviveHud();
 
   // modo solo Antorcha: Spiderman queda completamente inerte (no se dibuja,
   // no se actualiza, no colisiona con nada) — la Antorcha pasa a ser EL personaje
@@ -954,8 +1250,6 @@ function initGame(){
 
   updateLifeHud();
   updateAutoShootHud();
-  const flowEl0 = document.getElementById('flowIndicator');
-  if (flowEl0) flowEl0.style.display = 'none';
 
   updateTorchHud();
   updateTorchEnergyHud();
@@ -1116,6 +1410,7 @@ function ensureRevivePickup(){
   if (!twoPlayerMode){ revivePickup = null; return; }
   const exactlyOneDead = player.alive !== torch.alive;
   if (!exactlyOneDead){ revivePickup = null; return; }
+  if (matchReviveUsed >= MATCH_REVIVE_LIMIT){ revivePickup = null; return; } // límite de la partida agotado
   if (revivePickup) return; // ya está en el mapa, esperando a que lo agarren
   const survivor = player.alive ? player : torch;
   revivePickup = {
@@ -1149,6 +1444,10 @@ function tryReviveCollision(){
   }
   if (touched){
     stats.reviveCount = (stats.reviveCount||0) + 1;
+    matchReviveUsed++;
+    updateReviveHud();
+    vibrate([25, 30, 25, 30, 40]);
+    playSfx('revive');
     saveStats();
     if (revivePickup.type === 'player'){
       player.alive = true;
@@ -1189,6 +1488,8 @@ function pointToSegmentDist(px, py, x1, y1, x2, y2){
 
 function applyPowerUp(type, who){
   who = who || 'p1';
+  vibrate(18);
+  playSfx('powerup');
   // el súper salto lo puede agarrar cualquiera de los dos personajes, pero
   // siempre se activa para los dos a la vez (así ninguno se queda atrás)
   if (type === 'jump'){
@@ -1289,6 +1590,15 @@ function updateTorchHud(){
   }
   if (!twoPlayerMode && soloCharacter === 'torch') updateLifeHud();
 }
+// contador de revives disponibles (2P): 3 en total por partida, combinados entre
+// Spiderman y la Antorcha — se ve en el HUD solo en modo 2 jugadores
+function updateReviveHud(){
+  const wrap = document.getElementById('reviveIndicator');
+  const num = document.getElementById('reviveCountLeft');
+  if (!wrap || !num) return;
+  wrap.style.display = twoPlayerMode ? 'inline' : 'none';
+  num.textContent = Math.max(0, MATCH_REVIVE_LIMIT - matchReviveUsed);
+}
 function updateTorchAutoShootHud(){
   const el = document.getElementById('torchAutoShootIndicator');
   if (el && torch){
@@ -1329,9 +1639,10 @@ const SAND_CYCLE_LEN = SAND_REST + SAND_WARN + SAND_RISE + SAND_PEAK + SAND_FALL
 
 // villano volador: aparece poco al principio, cada vez más seguido con la distancia
 function ensureEnemies(){
-  if (progressM >= DIFF.goblinStart){
+  if (tutorialMode) return; // sin enemigos durante el tutorial, para practicar tranquilo
+  if (difficultyProgressM >= DIFF.goblinStart){
     let lastX = enemies.length ? enemies[enemies.length-1].x : cameraX + 700;
-    const p = progressM - DIFF.goblinStart;
+    const p = difficultyProgressM - DIFF.goblinStart;
     const spacingBase = Math.max(1000, 2600 - p*0.6);
     const spacingRand = Math.max(600, 1800 - p*0.4);
     while (lastX < cameraX + W + 900){
@@ -1357,8 +1668,9 @@ function ensureEnemies(){
 // trepador mecánico (varios brazos articulados): sube y baja por la fachada
 // de un edificio real, aparece recién pasados los primeros metros y cada vez más rápido/seguido
 function ensureClimbers(){
-  if (progressM >= DIFF.climberStart){
-    const p = progressM - DIFF.climberStart;
+  if (tutorialMode) return;
+  if (difficultyProgressM >= DIFF.climberStart){
+    const p = difficultyProgressM - DIFF.climberStart;
     const spacing = Math.max(900, 2600 - p*0.5); // distancia mínima en x entre trepadores
     let lastX = climbers.length ? climbers[climbers.length-1].x : -Infinity;
     for (const b of buildings){
@@ -1397,9 +1709,10 @@ function ensureClimbers(){
 // mano gigante de arena: emerge del fondo tratando de agarrarte, recién a partir
 // de cierta distancia, y cada vez alcanza más altura y aparece más seguido
 function ensureSandHands(){
-  if (progressM >= DIFF.sandStart){
+  if (tutorialMode) return;
+  if (difficultyProgressM >= DIFF.sandStart){
     let lastX = sandHands.length ? sandHands[sandHands.length-1].x : cameraX + 1100;
-    const p = progressM - DIFF.sandStart;
+    const p = difficultyProgressM - DIFF.sandStart;
     const spacingBase = Math.max(1400, 3400 - p*0.5);
     const spacingRand = Math.max(700, 1700 - p*0.3);
     while (lastX < cameraX + W + 1200){
@@ -1424,9 +1737,10 @@ function ensureSandHands(){
 // Rhino: corre por la calle a nivel del piso. Si volás "bajito" cerca de la
 // calle te lleva puesto. Aparece más adelante en el recorrido y cada vez más rápido.
 function ensureRhinos(){
-  if (progressM >= DIFF.rhinoStart){
+  if (tutorialMode) return;
+  if (difficultyProgressM >= DIFF.rhinoStart){
     let lastX = rhinos.length ? rhinos[rhinos.length-1].spawnX : cameraX + 900;
-    const p = progressM - DIFF.rhinoStart;
+    const p = difficultyProgressM - DIFF.rhinoStart;
     const spacingBase = Math.max(1300, 3200 - p*0.5);
     const spacingRand = Math.max(700, 1700 - p*0.3);
     while (lastX < cameraX + W + 1000){
@@ -1451,8 +1765,9 @@ function ensureRhinos(){
 // Escorpión: se queda quieto en un techo y dispara veneno con la cola hacia
 // donde estás. Aparece recién en tramos avanzados y dispara cada vez más seguido.
 function ensureScorpions(){
-  if (progressM >= DIFF.scorpionStart){
-    const p = progressM - DIFF.scorpionStart;
+  if (tutorialMode) return;
+  if (difficultyProgressM >= DIFF.scorpionStart){
+    const p = difficultyProgressM - DIFF.scorpionStart;
     const spacing = Math.max(1300, 3200 - p*0.5);
     let lastX = scorpions.length ? scorpions[scorpions.length-1].x : -Infinity;
     for (const b of buildings){
@@ -1548,8 +1863,7 @@ function tryShootWeb(clientX, clientY){
     web.len = dist;
     web.baseLen = dist;
     player.grounded = false;
-    player.attachFrame = elapsedFrames;
-    player.attachX = player.x;
+    if (tutorialMode === 'spiderman' && (tutorialStepIndex === 0 || tutorialStepIndex === 2)) advanceTutorialStep();
   } else {
     // tiro fallido: no hay nada ahí (o estás arriba del techo) — se ve la X y la
     // telaraña sale disparada hacia ese punto pero no engancha en ningún lado
@@ -1559,31 +1873,10 @@ function tryShootWeb(clientX, clientY){
 }
 function releaseWeb(){
   if (web.active){
-    // empuje parejo en cada suelta: ayuda a ganar altura en general, no solo con racha
+    // empuje parejo en cada suelta: ayuda a ganar altura al soltar la telaraña
     player.py += BASE_RELEASE_LIFT;
-
-    // racha de vuelo: soltar rápido y habiendo avanzado bastante suma combo y un
-    // empujón extra hacia arriba; quedarte todo el péndulo colgado corta la racha
-    const duration = elapsedFrames - player.attachFrame;
-    const traveled = player.x - player.attachX;
-    if (duration > 3 && duration < FAST_SWING_FRAMES && traveled > MIN_FLOW_DISTANCE){
-      player.flowCombo = Math.min(player.flowCombo + 1, MAX_FLOW_COMBO);
-    } else if (duration >= FAST_SWING_FRAMES){
-      player.flowCombo = 0;
-    }
-    if (player.flowCombo > 0){
-      player.py += FLOW_BOOST_PER_COMBO * player.flowCombo;
-      if (player.flowCombo >= 2) pickupMsg = { text: '🔥 Racha x' + player.flowCombo, timer: 35 };
-    }
-  }
-  const flowEl = document.getElementById('flowIndicator');
-  if (flowEl){
-    if (player.flowCombo >= 2){
-      flowEl.style.display = 'inline';
-      flowEl.textContent = '🔥 x' + player.flowCombo;
-    } else {
-      flowEl.style.display = 'none';
-    }
+    playSfx('swing');
+    if (tutorialMode === 'spiderman' && tutorialStepIndex === 1) advanceTutorialStep();
   }
   web.active = false;
 }
@@ -1692,6 +1985,8 @@ document.getElementById('menuFromDeathBtn').addEventListener('click', () => {
   showMenu();
 });
 function beginGame(){
+  ensureAudioCtx(); // desbloquea el audio acá, como reacción directa a un click/touch del jugador
+  playSfx('start');
   stopMenuBackground();
   document.getElementById('startOverlay').style.display = 'none';
   document.getElementById('hud').style.display = 'flex';
@@ -1722,11 +2017,18 @@ function togglePause(){
   if (gameOver) return;
   paused = !paused;
   document.getElementById('pauseOverlay').classList.toggle('show', paused);
+  if (tutorialMode){
+    const banner = document.getElementById('tutorialBanner');
+    if (banner) banner.style.display = paused ? 'none' : 'flex';
+  }
 }
 
 function showMenu(){
   paused = false;
   gameOver = true; // congela la física mientras se ve el menú
+  tutorialMode = null; // salir a este menú siempre corta cualquier tutorial en curso
+  const tutBanner = document.getElementById('tutorialBanner');
+  if (tutBanner) tutBanner.style.display = 'none';
   document.getElementById('pauseOverlay').classList.remove('show');
   document.getElementById('overlay').classList.remove('show');
   document.getElementById('hud').style.display = 'none';
@@ -1741,7 +2043,15 @@ function showMenu(){
 }
 
 function restart(){
+  if (tutorialMode){
+    tutorialStepIndex = 0;
+    tutorialImpulseCount = 0;
+  }
   initGame();
+  if (tutorialMode){
+    tutorialStepStartFrame = elapsedFrames;
+    updateTutorialBanner();
+  }
 }
 
 // ---------- física / update ----------
@@ -1765,8 +2075,20 @@ function update(){
     saveStats();
   }
 
+  // tutorial: si no se detecta la acción pedida en un rato, avanza igual para
+  // que nunca quede trabado esperando algo que tal vez no pase (ej. no hay
+  // ningún edificio cómodo cerca para reenganchar en ese tramo)
+  if (tutorialMode && tutorialStepIndex < TUTORIAL_STEPS[tutorialMode].length - 1 &&
+      elapsedFrames - tutorialStepStartFrame > TUTORIAL_STEP_TIMEOUT){
+    advanceTutorialStep();
+  }
+
   // metros de progreso: gobierna la dificultad (frecuencia/agresividad de enemigos)
   progressM = Math.max(progressM, Math.floor((activeX() - startBuilding.x) / 10));
+  // progreso "de dificultad": igual a progressM pero escalado por difficultyMultiplier
+  // (calculado al arrancar la partida según el historial reciente) — así el puntaje/HUD
+  // sigue siendo la distancia real, pero cuándo aparece cada enemigo se ajusta solo
+  difficultyProgressM = progressM * difficultyMultiplier;
 
   if (player.alive){
   let vx = player.x - player.px;
@@ -1871,6 +2193,12 @@ function update(){
         torch.energy = Math.max(0, torch.energy - TORCH_IMPULSE_COST);
         torch.flameFX = 12; // frames de llamarada visible del propulsor
         updateTorchEnergyHud();
+        playSfx('impulse');
+        if (tutorialMode === 'torch'){
+          tutorialImpulseCount++;
+          if (tutorialStepIndex === 0) advanceTutorialStep();
+          else if (tutorialStepIndex === 1 && tutorialImpulseCount >= 4) advanceTutorialStep();
+        }
       }
     }
 
@@ -1977,6 +2305,7 @@ function update(){
       updateTorchEnergyHud();
       pickupMsg = { text: '¡Energía de la Antorcha recargada! 🔥', timer: 70 };
       flamePowerUps.splice(i, 1);
+      if (tutorialMode === 'torch' && tutorialStepIndex === 2) advanceTutorialStep();
     }
   }
 
@@ -2131,17 +2460,23 @@ function update(){
       ch.px = ch.x - 12;
       pickupMsg = { text: defeatMsg, timer: 70 };
       if (isP1) updateLifeHud(); else updateTorchHud();
+      vibrate(25);
+      playSfx('bounce');
       return true; // derrotado: hay que sacarlo del mapa
     } else if (!twoPlayerMode){
       // en 1 jugador (Spiderman o Antorcha solo) hay un único personaje en
       // juego, sin revivir: cualquiera de los dos termina la partida directo
       deathTitle = failTitle;
+      vibrate([70, 40, 70]);
+      playSfx('death');
       triggerGameOver();
       return false;
     } else {
       ch.alive = false;
       deathTitle = failTitle;
       if (isP1) updateLifeHud(); else updateTorchHud();
+      vibrate([70, 40, 70]);
+      playSfx('death');
       checkBothDead();
       return false;
     }
@@ -2185,7 +2520,7 @@ function update(){
   // mano gigante de arena: ciclo de tiempo propio e independiente por cada una
   // (no reacciona a la cercanía del jugador), en loop de 5 etapas:
   // descanso -> aviso (sentido arácnido) -> subida (seno) -> pico -> bajada (coseno)
-  const sandMaxReach = H * Math.min(0.85, 0.50 + Math.max(0, progressM - DIFF.sandStart) * 0.0005);
+  const sandMaxReach = H * Math.min(0.85, 0.50 + Math.max(0, difficultyProgressM - DIFF.sandStart) * 0.0005);
   for (const s of sandHands){
     const f = (elapsedFrames + s.phase) % SAND_CYCLE_LEN;
     let heightFrac = 0, alert = 0;
@@ -2237,7 +2572,7 @@ function update(){
   sandHands = sandHands.filter(s => !s.defeated);
 
   // Rhino: corre por la calle; si volás cerca del piso te lleva puesto
-  const rhinoZone = Math.min(150, 75 + Math.max(0, progressM - DIFF.rhinoStart) * 0.03);
+  const rhinoZone = Math.min(150, 75 + Math.max(0, difficultyProgressM - DIFF.rhinoStart) * 0.03);
   for (const r of rhinos){
     r.x += r.speed;
     if (player.alive && !r.hit && Math.abs(player.x - r.x) < 44 && player.y > groundY - rhinoZone){
@@ -2319,9 +2654,14 @@ function update(){
     }
   }
 
-  // muerte: tocar el piso (salvo que tengamos vida extra, ahí rebota)
+  // muerte: tocar el piso (salvo que tengamos vida extra, ahí rebota) — en el
+  // tutorial nunca se pierde, solo rebota con un mensaje de aliento
   if (player.alive && player.y + player.radius >= groundY){
-    if (player.extraLives > 0){
+    if (tutorialMode){
+      player.y = groundY - player.radius - 4;
+      player.py = player.y + 34; player.px = player.x - 8;
+      pickupMsg = { text: 'Tranqui, en el tutorial no se pierde — probá de nuevo 💪', timer: 70 };
+    } else if (player.extraLives > 0){
       player.extraLives--;
       stats.extraLifeUses++;
       saveStats();
@@ -2330,9 +2670,13 @@ function update(){
       player.px = player.x - 8;
       pickupMsg = { text: '¡Rebote! Seguís en juego ❤️', timer: 70 };
       updateLifeHud();
+      vibrate(25);
+      playSfx('bounce');
     } else {
       player.y = groundY - player.radius;
       deathTitle = '💥 Tocaste el piso';
+      vibrate([70, 40, 70]);
+      playSfx('death');
       if (twoPlayerMode){
         player.alive = false;
         checkBothDead();
@@ -2347,7 +2691,13 @@ function update(){
   // (personaje único, sin revivir) termina la partida directamente, igual que
   // Spiderman en el 1P clásico.
   if ((twoPlayerMode || soloCharacter === 'torch') && torch.alive && torch.y + torch.radius >= groundY){
-    if (torch.extraLives > 0){
+    if (tutorialMode){
+      torch.y = groundY - torch.radius - 4;
+      torch.py = torch.y + 34; torch.px = torch.x - 8;
+      torch.energy = Math.max(torch.energy, 40);
+      updateTorchEnergyHud();
+      pickupMsg = { text: 'Tranqui, en el tutorial no se pierde — probá de nuevo 💪', timer: 70 };
+    } else if (torch.extraLives > 0){
       torch.extraLives--;
       stats.extraLifeUses++;
       saveStats();
@@ -2356,9 +2706,13 @@ function update(){
       torch.px = torch.x - 8;
       pickupMsg = { text: twoPlayerMode ? '¡Rebote de la Antorcha! Sigue en juego ❤️' : '¡Rebote! Seguís en juego ❤️', timer: 70 };
       updateTorchHud();
+      vibrate(25);
+      playSfx('bounce');
     } else {
       torch.y = groundY - torch.radius;
       deathTitle = '💥 Tocaste el piso';
+      vibrate([70, 40, 70]);
+      playSfx('death');
       if (twoPlayerMode){
         torch.alive = false;
         updateTorchHud();
@@ -2407,6 +2761,51 @@ function recordFieldForRun(){
   return (!twoPlayerMode && soloCharacter === 'torch') ? 'bestDistanceTorch' : 'bestDistanceSpiderman';
 }
 
+// guarda esta partida en el historial reciente (más nueva primero, tope de
+// MATCH_HISTORY_LIMIT partidas) — no se comparte a ningún lado, solo se muestra
+// en la pantalla de Historial del menú principal
+function recordMatchHistory(distance, heightMeters){
+  const mode = twoPlayerMode ? '2p' : (soloCharacter === 'torch' ? 'torch' : 'spiderman');
+  if (!stats.matchHistory) stats.matchHistory = [];
+  stats.matchHistory.unshift({ mode, distance, height: heightMeters, date: Date.now() });
+  if (stats.matchHistory.length > MATCH_HISTORY_LIMIT) stats.matchHistory.length = MATCH_HISTORY_LIMIT;
+}
+
+// dificultad adaptativa: mira el promedio de las últimas partidas (cualquier
+// modo/personaje) y ajusta qué tan pronto aparecen los enemigos. Si venís
+// muriendo muy rápido, los umbrales se corren más lejos (más indulgente); si
+// venís llegando lejos, se acercan un poco (para que se mantenga desafiante).
+// Nunca sale de un rango razonable, así nunca es ni imposible ni trivial.
+function computeDifficultyMultiplier(){
+  const hist = (stats.matchHistory || []).slice(0, 5);
+  if (hist.length === 0) return 1;
+  const avg = hist.reduce((sum, m) => sum + m.distance, 0) / hist.length;
+  const REFERENCE_DISTANCE = 1200; // distancia "pareja" con los umbrales originales de DIFF
+  let mult = avg / REFERENCE_DISTANCE;
+  return Math.max(0.6, Math.min(1.5, mult));
+}
+
+function renderHistory(){
+  const list = document.getElementById('historyList');
+  if (!list) return;
+  const hist = stats.matchHistory || [];
+  if (hist.length === 0){
+    list.innerHTML = '<div class="hist-empty">Todavía no jugaste ninguna partida.</div>';
+    return;
+  }
+  const icons = { spiderman: '🕷️', torch: '🔥', '2p': '🤝' };
+  const labels = { spiderman: 'Spiderman', torch: 'Antorcha Humana', '2p': '2 jugadores' };
+  list.innerHTML = hist.map(m => {
+    const d = new Date(m.date);
+    const fecha = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return '<div class="hist-row">' +
+      '<span class="hist-icon">' + (icons[m.mode] || '🎮') + '</span>' +
+      '<div><div class="hist-dist">' + m.distance + ' m &middot; ' + (labels[m.mode] || m.mode) + '</div>' +
+      '<div class="hist-meta">' + fecha + (m.height ? ' &middot; altura máx. ' + m.height + ' m' : '') + '</div></div>' +
+      '</div>';
+  }).join('');
+}
+
 function triggerGameOver(){
   if (gameOver) return;
   gameOver = true;
@@ -2421,6 +2820,7 @@ function triggerGameOver(){
   const isNewRecord = score > prevBest;
   stats[field] = Math.max(prevBest, score);
   stats.bestHeight = Math.max(stats.bestHeight, heightMeters);
+  recordMatchHistory(score, heightMeters);
   saveStats();
   renderHomeRecords();
 
@@ -4252,6 +4652,59 @@ function drawHelicopters(){
   }
 }
 
+// indicador de peligro: mira un poco más adelante de lo que se ve en cámara y
+// avisa con una flechita en el borde derecho si viene un enemigo, para que no
+// aparezca "de sorpresa" justo al entrar en pantalla
+const DANGER_LOOKAHEAD = 460;
+function collectDangerThreats(){
+  if (gameOver) return [];
+  const rightEdge = cameraX + W;
+  const threats = [];
+  for (const en of enemies){
+    if (en.hit || en.counted) continue;
+    const x = en.drawX !== undefined ? en.drawX : en.x;
+    if (x > rightEdge && x < rightEdge + DANGER_LOOKAHEAD) threats.push({ x, y: en.baseY !== undefined ? en.baseY : en.y, icon: en.style === 'torch' ? '🏄' : '🦹' });
+  }
+  for (const r of rhinos){
+    if (r.hit || r.counted) continue;
+    if (r.x > rightEdge && r.x < rightEdge + DANGER_LOOKAHEAD) threats.push({ x: r.x, y: groundY - 40, icon: r.style === 'torch' ? '🕳️' : '🦏' });
+  }
+  for (const s of sandHands){
+    if (s.hit || (s.heightFactor||0) < 0.25) continue;
+    if (s.x > rightEdge && s.x < rightEdge + DANGER_LOOKAHEAD) threats.push({ x: s.x, y: s.topY || groundY - 100, icon: s.style === 'torch' ? '☄️' : '✋' });
+  }
+  for (const s of scorpions){
+    if (s.hit || s.cooldown > 45) continue; // recién avisar cuando está por disparar
+    if (s.x > rightEdge && s.x < rightEdge + DANGER_LOOKAHEAD) threats.push({ x: s.x, y: s.y, icon: s.style === 'torch' ? '💥' : '🦂' });
+  }
+  threats.sort((a, b) => a.x - b.x);
+  return threats.slice(0, 3);
+}
+function drawDangerIndicators(){
+  const threats = collectDangerThreats();
+  if (threats.length === 0) return;
+  const rightEdge = cameraX + W;
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const t of threats){
+    const dist = t.x - rightEdge;
+    const alpha = Math.max(0.35, 1 - dist / DANGER_LOOKAHEAD);
+    const py = Math.max(28, Math.min(H - 28, t.y));
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#ff4d4d';
+    ctx.beginPath();
+    ctx.moveTo(W - 10, py);
+    ctx.lineTo(W - 25, py - 9);
+    ctx.lineTo(W - 25, py + 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.font = '16px sans-serif';
+    ctx.globalAlpha = Math.min(1, alpha + 0.25);
+    ctx.fillText(t.icon, W - 42, py);
+  }
+  ctx.restore();
+}
+
 function draw(){
   drawSky();
   drawBuildings();
@@ -4277,6 +4730,7 @@ function draw(){
   drawMissMarker();
   drawPlayer();
   drawTorch();
+  drawDangerIndicators();
   drawPickupMsg();
 }
 
