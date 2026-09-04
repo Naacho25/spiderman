@@ -423,9 +423,10 @@ const AUTO_SHOOT_COOLDOWN = 24;  // frames entre disparo y disparo
 // ---------- modo 2 jugadores (Antorcha Humana, solo PC) ----------
 let twoPlayerMode = false;
 const TORCH_MAX_ENERGY = 100;
-const TORCH_IMPULSE_COST = 9;    // energía que gasta cada impulso (apretada de Espacio)
-const TORCH_IMPULSE_KICK = 6.2;  // fuerza del impulso vertical por apretada
-const TORCH_MOVE_SPEED = 4.2;    // empujón manual extra con las flechas (izq/der)
+const TORCH_IMPULSE_COST = 8;      // energía que gasta cada impulso (apretada de Espacio)
+const TORCH_IMPULSE_KICK = 10.5;   // fuerza del impulso vertical por apretada (subida real de un solo toque)
+const TORCH_IMPULSE_SIDE_KICK = 3; // "leve orientación" horizontal si tenés una flecha apretada al impulsar
+const TORCH_MOVE_SPEED = 4.2;    // (sin uso en el impulso; queda por compatibilidad)
 let torch, flamePowerUps, revivePickup, torchShots, keys2;
 let torchImpulsePending = false; // se activa con cada apretada de Espacio (borde, no mantenida)
 let torchCruiseSpeed = 0;        // velocidad horizontal "de crucero", se adapta sola a la de Spiderman
@@ -1645,7 +1646,15 @@ function update(){
     if (torchImpulsePending){
       torchImpulsePending = false;
       if (torch.energy > 0){
+        // el impulso es SIEMPRE mayormente vertical (para arriba); si en el
+        // momento de apretar Espacio hay una flecha izq/der apretada, se le
+        // suma una leve orientación horizontal hacia ese lado — las flechas
+        // ya no mueven solas, solo "orientan" el impulso
         tvy -= TORCH_IMPULSE_KICK;
+        if (!soloTorchActive){
+          if (keys2.left) tvx -= TORCH_IMPULSE_SIDE_KICK;
+          if (keys2.right) tvx += TORCH_IMPULSE_SIDE_KICK;
+        }
         torch.energy = Math.max(0, torch.energy - TORCH_IMPULSE_COST);
         torch.flameFX = 12; // frames de llamarada visible del propulsor
         updateTorchEnergyHud();
@@ -1663,12 +1672,11 @@ function update(){
       drift = Math.min(SOLO_TORCH_MAX_SPEED, SOLO_TORCH_BASE_SPEED + progressM * SOLO_TORCH_SPEED_GROWTH);
     } else {
       // modo 2P: velocidad de crucero que se acerca de a poco a la velocidad
-      // horizontal real de Spiderman (lastPlayerVX), más el empujón manual
-      // de las flechas
+      // horizontal real de Spiderman (lastPlayerVX). El movimiento lateral
+      // "a propósito" ahora se logra orientando los impulsos con las flechas
+      // (arriba), no con un desplazamiento continuo mientras las mantenés.
       torchCruiseSpeed += (lastPlayerVX - torchCruiseSpeed) * 0.05;
       drift = torchCruiseSpeed;
-      if (keys2.left) drift -= TORCH_MOVE_SPEED;
-      if (keys2.right) drift += TORCH_MOVE_SPEED;
     }
     // se aplica como desplazamiento directo (no como "velocidad" del sistema
     // verlet), para que no se lea como impulso extra y se acumule frame a frame.
