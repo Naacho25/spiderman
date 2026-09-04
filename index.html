@@ -36,12 +36,6 @@
   }
   #hud2 span { color: #ffb347; }
 
-  #twoPlayerLabel {
-    display: flex; align-items: center; gap: 8px; margin-top: 14px;
-    font-size: 14px; color: #ccc; cursor: pointer;
-  }
-  #twoPlayerLabel input { width: 16px; height: 16px; cursor: pointer; }
-
   /* en mobile (pantalla chica o entrada táctil) el HUD se agranda y se separa
      mejor de los bordes/notch, para que se lea cómodo sin achicarse con el resto */
   @media (max-width: 720px), (pointer: coarse) {
@@ -83,43 +77,84 @@
 
   #startOverlay {
     position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-    flex-direction: column; background: rgba(6,4,14,.85);
-    color: #fff; text-align: center; z-index: 5;
+    flex-direction: column; text-align: center; z-index: 5;
+    background:
+      radial-gradient(ellipse at 50% -10%, rgba(77,208,225,.16), transparent 55%),
+      radial-gradient(ellipse at 85% 110%, rgba(255,90,20,.14), transparent 50%),
+      rgba(6,4,14,.92);
+    color: #fff; padding: 20px; box-sizing: border-box; overflow-y: auto;
   }
-  #startOverlay h1 { font-size: 34px; margin-bottom: 4px; }
-  #startOverlay p { color: #bbb; max-width: 380px; line-height: 1.5; font-size: 15px; }
-  #startBtn {
-    background: #4dd0e1; color: #08202a; border: none; padding: 13px 34px;
-    font-size: 17px; font-weight: 800; border-radius: 30px; cursor: pointer; margin-top: 18px;
+  .menu-screen {
+    display: flex; flex-direction: column; align-items: center;
+    width: 100%; max-width: 460px; animation: menuFadeIn .22s ease;
   }
+  @keyframes menuFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  #startOverlay h1 { font-size: 36px; margin: 0 0 6px; letter-spacing: .5px; }
+  #startOverlay h2 { font-size: 24px; margin: 0 0 6px; }
+  #startOverlay p { color: #bbb; max-width: 380px; line-height: 1.5; font-size: 15px; margin: 0 0 6px; }
+  .menu-subtitle { color: #999; font-size: 13.5px; margin: 0 0 22px; }
+
+  .menu-primary-btn {
+    background: linear-gradient(135deg, #4dd0e1, #38b6c9); color: #08202a; border: none;
+    padding: 14px 40px; font-size: 17px; font-weight: 800; border-radius: 30px; cursor: pointer;
+    margin-top: 20px; box-shadow: 0 6px 18px rgba(77,208,225,.3); transition: transform .12s;
+  }
+  .menu-primary-btn:hover { transform: scale(1.03); }
+  .menu-primary-btn:active { transform: scale(.97); }
+  .menu-secondary-btn {
+    background: transparent; color: #ddd; border: 2px solid rgba(255,255,255,.25);
+    padding: 10px 26px; font-size: 14px; font-weight: 700; border-radius: 24px;
+    cursor: pointer; margin-top: 12px; transition: transform .12s, border-color .15s;
+  }
+  .menu-secondary-btn:hover { border-color: rgba(255,255,255,.5); transform: scale(1.02); }
+  .menu-back-btn {
+    background: transparent; color: #888; border: none; font-size: 13.5px;
+    cursor: pointer; margin-top: 18px; padding: 6px 10px; transition: color .15s;
+  }
+  .menu-back-btn:hover { color: #ccc; }
+
+  .mode-cards, .char-cards { display: flex; gap: 16px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
+  .mode-card, .char-card {
+    background: rgba(255,255,255,.05); border: 2px solid rgba(255,255,255,.1); border-radius: 18px;
+    padding: 20px 22px; cursor: pointer; display: flex; flex-direction: column; align-items: center;
+    gap: 6px; width: 168px; transition: transform .12s, border-color .15s, background .15s;
+  }
+  .mode-card:hover, .char-card:hover { transform: translateY(-3px); background: rgba(255,255,255,.08); }
+  .mode-card.selected, .char-card.selected { border-color: #4dd0e1; background: rgba(77,208,225,.1); }
+  .mode-card-icon, .char-card-icon { font-size: 30px; }
+  .mode-card-title, .char-card-title { font-size: 15px; font-weight: 800; }
+  .mode-card-desc, .char-card-sub { font-size: 12px; color: #999; }
+  .char-card { cursor: default; }
+  .char-card .char-card-title { cursor: pointer; }
+
   #skinPicker {
-    display: flex; gap: 16px; margin-top: 20px; flex-wrap: wrap;
-    justify-content: center; max-width: 380px;
+    display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap;
+    justify-content: center; max-width: 260px;
   }
-  .skin-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .skin-item { display: flex; flex-direction: column; align-items: center; gap: 5px; }
   .skin-swatch {
-    width: 48px; height: 48px; border-radius: 50%; cursor: pointer;
+    width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
     border: 3px solid transparent; box-shadow: 0 3px 10px rgba(0,0,0,.5);
     transition: transform .12s, border-color .15s;
   }
   .skin-swatch:hover { transform: scale(1.06); }
   .skin-swatch.selected { border-color: #fff; transform: scale(1.1); }
-  .skin-label { font-size: 11px; color: #bbb; }
+  .skin-label { font-size: 10px; color: #bbb; }
   .skin-label.selected { color: #fff; font-weight: 700; }
 
-  #characterPicker { display: flex; gap: 12px; margin-top: 20px; }
-  .char-btn {
-    background: rgba(255,255,255,.08); color: #ccc; border: 2px solid transparent;
-    padding: 10px 18px; border-radius: 22px; font-size: 14px; font-weight: 700;
-    cursor: pointer; transition: transform .12s, border-color .15s, background .15s;
+  @media (max-width: 400px){
+    .mode-card, .char-card { width: 140px; padding: 16px 14px; }
+    #startOverlay h1 { font-size: 30px; }
   }
-  .char-btn:hover { transform: scale(1.04); }
-  .char-btn.selected { border-color: #fff; background: rgba(255,255,255,.2); color: #fff; }
-  #characterPicker.disabled .char-btn { opacity: .4; pointer-events: none; }
-  #characterPickerNote {
-    font-size: 11px; color: #888; margin-top: 4px; height: 14px; visibility: hidden;
+
+  .duo-info { width: 100%; margin-top: 6px; }
+  .duo-row {
+    display: flex; gap: 12px; align-items: center; text-align: left;
+    background: rgba(255,255,255,.05); border-radius: 14px; padding: 12px 16px; margin-bottom: 10px;
   }
-  #characterPickerNote.show { visibility: visible; }
+  .duo-row b { display: block; margin-bottom: 2px; font-size: 14px; }
+  .duo-row div { font-size: 12.5px; color: #bbb; line-height: 1.4; }
+  .duo-icon { font-size: 24px; flex-shrink: 0; }
 
   #achievementsBtn {
     background: transparent; color: #ffd166; border: 2px solid #ffd166;
@@ -247,20 +282,70 @@
 </div>
 
 <div id="startOverlay">
-  <h1>🕸️ Trepamuros</h1>
-  <p>Colgate de edificio en edificio con tu telaraña. Apuntá con el mouse (o el dedo) a una pared y mantené presionado para engancharte. Si tocás la calle, se acabó.</p>
-  <div id="skinPicker"></div>
-  <div id="characterPicker">
-    <button type="button" class="char-btn" data-char="spiderman">🕷️ Spiderman</button>
-    <button type="button" class="char-btn" data-char="torch">🔥 Antorcha Humana</button>
+
+  <div id="homeMenu" class="menu-screen">
+    <h1>🕸️ Trepamuros</h1>
+    <p>Colgate de edificio en edificio por las calles de Nueva York.</p>
+    <button id="goPlayBtn" class="menu-primary-btn">▶️ Jugar</button>
+    <button id="achievementsBtn" class="menu-secondary-btn">🏆 Logros</button>
+    <button id="instructionsBtn" class="menu-secondary-btn">📖 ¿Cómo se juega?</button>
   </div>
-  <div id="characterPickerNote">(se ignora con 2 jugadores activado)</div>
-  <label id="twoPlayerLabel">
-    <input type="checkbox" id="twoPlayerCheckbox"> 🔥 2 jugadores (solo PC)
-  </label>
-  <button id="startBtn">Jugar</button>
-  <button id="achievementsBtn">🏆 Logros</button>
-  <button id="instructionsBtn">📖 Instrucciones</button>
+
+  <div id="modeMenu" class="menu-screen" style="display:none">
+    <h2>¿Cuántos jugadores?</h2>
+    <div class="menu-subtitle">Elegí cómo querés jugar esta partida</div>
+    <div class="mode-cards">
+      <button type="button" class="mode-card" id="pick1PBtn">
+        <span class="mode-card-icon">🕹️</span>
+        <span class="mode-card-title">1 Jugador</span>
+        <span class="mode-card-desc">Elegís tu personaje</span>
+      </button>
+      <button type="button" class="mode-card" id="pick2PBtn">
+        <span class="mode-card-icon">🤝</span>
+        <span class="mode-card-title">2 Jugadores</span>
+        <span class="mode-card-desc">Local, solo en PC</span>
+      </button>
+    </div>
+    <button type="button" class="menu-back-btn" data-back="homeMenu">← Volver</button>
+  </div>
+
+  <div id="soloSetupMenu" class="menu-screen" style="display:none">
+    <h2>Elegí tu personaje</h2>
+    <div class="menu-subtitle">Con quién querés jugar esta partida</div>
+    <div class="char-cards">
+      <div class="char-card" id="spidermanCard" data-char="spiderman">
+        <div class="char-card-icon">🕷️</div>
+        <div class="char-card-title">Spiderman</div>
+        <div class="char-card-sub">Telaraña y swing</div>
+        <div id="skinPicker"></div>
+      </div>
+      <div class="char-card" id="torchCard" data-char="torch">
+        <div class="char-card-icon">🔥</div>
+        <div class="char-card-title">Antorcha Humana</div>
+        <div class="char-card-sub">Vuelo a impulsos, sin telaraña</div>
+      </div>
+    </div>
+    <button id="soloStartBtn" class="menu-primary-btn">Comenzar</button>
+    <button type="button" class="menu-back-btn" data-back="modeMenu">← Volver</button>
+  </div>
+
+  <div id="duoSetupMenu" class="menu-screen" style="display:none">
+    <h2>🤝 2 Jugadores</h2>
+    <div class="menu-subtitle">Local, en el mismo teclado</div>
+    <div class="duo-info">
+      <div class="duo-row">
+        <span class="duo-icon">🕷️</span>
+        <div><b>Jugador 1: Spiderman</b>Mouse o touch para tirar la telaraña. WASD para asistir en el aire.</div>
+      </div>
+      <div class="duo-row">
+        <span class="duo-icon">🔥</span>
+        <div><b>Jugador 2: Antorcha Humana</b>Flechas para orientarse, Espacio para impulsarse hacia arriba.</div>
+      </div>
+    </div>
+    <button id="duoStartBtn" class="menu-primary-btn">Comenzar</button>
+    <button type="button" class="menu-back-btn" data-back="modeMenu">← Volver</button>
+  </div>
+
 </div>
 
 <div id="achievementsOverlay">
@@ -470,7 +555,13 @@ function renderSkinPicker(){
     const swatch = document.createElement('div');
     swatch.className = 'skin-swatch' + (i === selectedSkin ? ' selected' : '');
     swatch.style.background = `linear-gradient(135deg, ${s.torso} 55%, ${s.legs} 55%)`;
-    swatch.addEventListener('click', () => { selectedSkin = i; renderSkinPicker(); });
+    swatch.addEventListener('click', (ev) => {
+      ev.stopPropagation(); // no burbujea al click de la card (que también selecciona el personaje)
+      selectedSkin = i;
+      soloCharacter = 'spiderman'; // elegir una skin implica jugar con Spiderman
+      renderSkinPicker();
+      renderCharacterPicker();
+    });
     const label = document.createElement('div');
     label.className = 'skin-label' + (i === selectedSkin ? ' selected' : '');
     label.textContent = s.name;
@@ -481,42 +572,40 @@ function renderSkinPicker(){
 }
 renderSkinPicker();
 
-// ---------- selector de personaje (solo 1 jugador, mobile y PC) ----------
-function renderCharacterPicker(){
-  document.querySelectorAll('.char-btn').forEach(b => {
-    b.classList.toggle('selected', b.dataset.char === soloCharacter);
+// ---------- navegación del menú (Inicio → Jugar → 1P/2P) ----------
+function showMenuScreen(id){
+  document.querySelectorAll('#startOverlay .menu-screen').forEach(s => {
+    s.style.display = (s.id === id) ? 'flex' : 'none';
   });
 }
-document.querySelectorAll('.char-btn').forEach(b => {
-  b.addEventListener('click', () => {
-    const picker = document.getElementById('characterPicker');
-    if (picker && picker.classList.contains('disabled')) return; // 2P activado: no aplica
-    soloCharacter = b.dataset.char;
-    renderCharacterPicker();
-  });
+document.getElementById('goPlayBtn').addEventListener('click', () => showMenuScreen('modeMenu'));
+document.getElementById('pick1PBtn').addEventListener('click', () => showMenuScreen('soloSetupMenu'));
+document.getElementById('pick2PBtn').addEventListener('click', () => showMenuScreen('duoSetupMenu'));
+document.querySelectorAll('.menu-back-btn').forEach(b => {
+  b.addEventListener('click', () => showMenuScreen(b.dataset.back));
+});
+
+// ---------- selector de personaje (solo 1 jugador, mobile y PC) ----------
+function renderCharacterPicker(){
+  document.getElementById('spidermanCard').classList.toggle('selected', soloCharacter === 'spiderman');
+  document.getElementById('torchCard').classList.toggle('selected', soloCharacter === 'torch');
+}
+document.getElementById('spidermanCard').addEventListener('click', () => {
+  soloCharacter = 'spiderman';
+  renderCharacterPicker();
+});
+document.getElementById('torchCard').addEventListener('click', () => {
+  soloCharacter = 'torch';
+  renderCharacterPicker();
 });
 renderCharacterPicker();
 
-// con el modo 2P activado el selector de personaje no aplica (siempre es
-// Spiderman + Antorcha como jugador 2), así que se ve deshabilitado
-function updateCharacterPickerEnabled(){
-  const tpCheckbox = document.getElementById('twoPlayerCheckbox');
-  const picker = document.getElementById('characterPicker');
-  const note = document.getElementById('characterPickerNote');
-  const isTwoP = !!(tpCheckbox && tpCheckbox.checked);
-  if (picker) picker.classList.toggle('disabled', isTwoP);
-  if (note) note.classList.toggle('show', isTwoP);
-}
-const twoPlayerCheckboxEl = document.getElementById('twoPlayerCheckbox');
-if (twoPlayerCheckboxEl) twoPlayerCheckboxEl.addEventListener('change', updateCharacterPickerEnabled);
-updateCharacterPickerEnabled();
-
 // el modo 2 jugadores necesita teclado (WASD/flechas/Espacio): en dispositivos
-// solo-táctiles no tiene sentido ofrecerlo, así que se oculta el casillero
+// solo-táctiles no tiene sentido ofrecerlo, así que se oculta esa opción
 (function hideTwoPlayerOnTouch(){
   const isTouchOnly = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
   if (isTouchOnly){
-    const el = document.getElementById('twoPlayerLabel');
+    const el = document.getElementById('pick2PBtn');
     if (el) el.style.display = 'none';
   }
 })();
@@ -1497,15 +1586,21 @@ document.getElementById('menuFromDeathBtn').addEventListener('click', () => {
   document.getElementById('overlay').classList.remove('show');
   showMenu();
 });
-document.getElementById('startBtn').addEventListener('click', () => {
-  const tpCheckbox = document.getElementById('twoPlayerCheckbox');
-  twoPlayerMode = !!(tpCheckbox && tpCheckbox.checked);
+function beginGame(){
   document.getElementById('startOverlay').style.display = 'none';
   document.getElementById('hud').style.display = 'flex';
   document.getElementById('pauseBtn').style.display = 'flex';
   paused = false;
   initGame();
   if (!running){ running = true; requestAnimationFrame(loop); }
+}
+document.getElementById('soloStartBtn').addEventListener('click', () => {
+  twoPlayerMode = false;
+  beginGame();
+});
+document.getElementById('duoStartBtn').addEventListener('click', () => {
+  twoPlayerMode = true;
+  beginGame();
 });
 
 document.getElementById('pauseBtn').addEventListener('click', togglePause);
@@ -1533,6 +1628,7 @@ function showMenu(){
   if (hud2El) hud2El.style.display = 'none';
   document.getElementById('pauseBtn').style.display = 'none';
   document.getElementById('startOverlay').style.display = 'flex';
+  showMenuScreen('homeMenu');
   renderSkinPicker();
 }
 
