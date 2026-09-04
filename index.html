@@ -26,6 +26,22 @@
   }
   #hud span { color: #ffd166; }
 
+  #hud2 {
+    position: fixed; top: 64px; right: 14px; color: #fff;
+    font-size: 17px; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.6);
+    letter-spacing: .5px; user-select: none; pointer-events: none; display: none;
+    flex-direction: column; align-items: flex-end; gap: 4px;
+    background: rgba(60,20,0,.4); padding: 7px 14px; border-radius: 16px;
+    max-width: calc(100vw - 28px); z-index: 3;
+  }
+  #hud2 span { color: #ffb347; }
+
+  #twoPlayerLabel {
+    display: flex; align-items: center; gap: 8px; margin-top: 14px;
+    font-size: 14px; color: #ccc; cursor: pointer;
+  }
+  #twoPlayerLabel input { width: 16px; height: 16px; cursor: pointer; }
+
   /* en mobile (pantalla chica o entrada táctil) el HUD se agranda y se separa
      mejor de los bordes/notch, para que se lea cómodo sin achicarse con el resto */
   @media (max-width: 720px), (pointer: coarse) {
@@ -90,6 +106,20 @@
   .skin-swatch.selected { border-color: #fff; transform: scale(1.1); }
   .skin-label { font-size: 11px; color: #bbb; }
   .skin-label.selected { color: #fff; font-weight: 700; }
+
+  #characterPicker { display: flex; gap: 12px; margin-top: 20px; }
+  .char-btn {
+    background: rgba(255,255,255,.08); color: #ccc; border: 2px solid transparent;
+    padding: 10px 18px; border-radius: 22px; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: transform .12s, border-color .15s, background .15s;
+  }
+  .char-btn:hover { transform: scale(1.04); }
+  .char-btn.selected { border-color: #fff; background: rgba(255,255,255,.2); color: #fff; }
+  #characterPicker.disabled .char-btn { opacity: .4; pointer-events: none; }
+  #characterPickerNote {
+    font-size: 11px; color: #888; margin-top: 4px; height: 14px; visibility: hidden;
+  }
+  #characterPickerNote.show { visibility: visible; }
 
   #achievementsBtn {
     background: transparent; color: #ffd166; border: 2px solid #ffd166;
@@ -191,6 +221,12 @@
   <span id="lifeIndicator" style="display:none">❤️</span>
   <span id="flowIndicator" style="display:none"></span>
   <span id="autoShootIndicator" style="display:none">🕸️ 0s</span>
+  <span id="soloTorchEnergyIndicator" style="display:none">🔥 <span id="soloTorchEnergyValue">100</span>%</span>
+</div>
+<div id="hud2">
+  <span>🔥 Antorcha: <span id="torchEnergy">100</span>%</span>
+  <span id="torchLifeIndicator" style="display:none">❤️</span>
+  <span id="torchAutoShootIndicator" style="display:none">🔥 0s</span>
 </div>
 <button id="pauseBtn">⏸</button>
 <div id="achievementToast"></div>
@@ -214,6 +250,14 @@
   <h1>🕸️ Trepamuros</h1>
   <p>Colgate de edificio en edificio con tu telaraña. Apuntá con el mouse (o el dedo) a una pared y mantené presionado para engancharte. Si tocás la calle, se acabó.</p>
   <div id="skinPicker"></div>
+  <div id="characterPicker">
+    <button type="button" class="char-btn" data-char="spiderman">🕷️ Spiderman</button>
+    <button type="button" class="char-btn" data-char="torch">🔥 Antorcha Humana</button>
+  </div>
+  <div id="characterPickerNote">(se ignora con 2 jugadores activado)</div>
+  <label id="twoPlayerLabel">
+    <input type="checkbox" id="twoPlayerCheckbox"> 🔥 2 jugadores (solo PC)
+  </label>
   <button id="startBtn">Jugar</button>
   <button id="achievementsBtn">🏆 Logros</button>
   <button id="instructionsBtn">📖 Instrucciones</button>
@@ -306,12 +350,20 @@
       <div><div class="instr-name">Trajes</div><div class="instr-desc">Elegí tu skin en el menú principal antes de jugar. Hay 5 para probar.</div></div>
     </div>
     <div class="instr-row">
+      <span class="instr-icon">🎮</span>
+      <div><div class="instr-name">Elegí tu personaje</div><div class="instr-desc">En el menú principal podés elegir jugar solo con 🕷️ <strong>Spiderman</strong> (telaraña, como siempre) o solo con la 🔥 <strong>Antorcha Humana</strong>. Jugando de Antorcha avanzás sola automáticamente, cada vez más rápido — vos solo controlás la altura: <strong>Espacio</strong> (o tocar/clickear en cualquier parte de la pantalla) da un impulso hacia arriba y gasta energía; la llamita 🔥 te la recarga. Si se te acaba la energía no podés impulsarte más, así que dosificá los toques. Este selector no aplica si activás el modo 2 jugadores (ahí siempre es Spiderman + Antorcha).</div></div>
+    </div>
+    <div class="instr-row">
       <span class="instr-icon">🏆</span>
       <div><div class="instr-name">Logros</div><div class="instr-desc">Se desbloquean por distancia, altura, power-ups agarrados, enemigos esquivados y más. Se guardan solos entre partidas.</div></div>
     </div>
     <div class="instr-row">
       <span class="instr-icon">⏸</span>
       <div><div class="instr-name">Pausa</div><div class="instr-desc">Botón arriba a la derecha (o tecla Escape/P) para pausar y volver al menú principal sin perder tu progreso guardado.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🔥</span>
+      <div><div class="instr-name">Modo 2 jugadores (solo PC)</div><div class="instr-desc">Activá el casillero en el menú principal para sumar a la Antorcha Humana como jugador 2. Spiderman pasa a moverse con <strong>WASD</strong>. La Antorcha se controla con <strong>flechas izquierda/derecha</strong> para moverse y <strong>Espacio</strong> para volar hacia arriba (gasta energía; al soltar, cae). La llamita 🔥 le recarga la energía. Si uno de los dos muere, el otro sigue solo y aparece un power-up para revivirlo (🔥 si murió la Antorcha, 🕸️ si murió Spiderman). La partida termina recién cuando mueren los dos.</div></div>
     </div>
   </div>
   <button id="closeInstructions">Volver</button>
@@ -321,8 +373,34 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let W, H;
-function resize(){ W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+// Resolución LÓGICA del juego (con la que trabaja toda la física/generación) vs.
+// tamaño real en pantalla (CSS): el lado corto de la resolución lógica nunca baja
+// de MIN_SHORT_DIM. En un celular angosto (retrato) o bajito (horizontal), esto
+// agranda el "mundo visible" — como alejar la cámara — para que siempre quede
+// espacio suficiente para colgarse, balancearse y esquivar enemigos, sin que se
+// vea todo diminuto. En pantallas grandes (desktop) no cambia nada: escala = 1.
+const MIN_SHORT_DIM = 640;
+function resize(){
+  const rw = innerWidth, rh = innerHeight;
+  const shortSide = Math.min(rw, rh);
+  const scaleUp = shortSide < MIN_SHORT_DIM ? MIN_SHORT_DIM / shortSide : 1;
+  W = canvas.width = Math.round(rw * scaleUp);
+  H = canvas.height = Math.round(rh * scaleUp);
+  // el tamaño CSS sigue siendo la pantalla real: el navegador escala el dibujo
+  // (sin distorsionar, mismo factor en X e Y) para que ocupe toda la pantalla
+  canvas.style.width = rw + 'px';
+  canvas.style.height = rh + 'px';
+}
 resize(); addEventListener('resize', resize);
+
+// convierte coordenadas de mouse/touch (en píxeles CSS reales de pantalla) a
+// coordenadas del canvas lógico — necesario porque ahora pueden no coincidir 1:1
+function clientToCanvas(clientX, clientY){
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+}
 addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('selectstart', e => e.preventDefault());
 
@@ -341,6 +419,25 @@ const FLOW_BOOST_PER_COMBO = 3.4;
 const BASE_RELEASE_LIFT = 2.2; // empuje parejo en cada suelta, tengas racha o no
 const MAX_FLOW_COMBO = 6;
 const AUTO_SHOOT_COOLDOWN = 24;  // frames entre disparo y disparo
+
+// ---------- modo 2 jugadores (Antorcha Humana, solo PC) ----------
+let twoPlayerMode = false;
+const TORCH_MAX_ENERGY = 100;
+const TORCH_IMPULSE_COST = 9;    // energía que gasta cada impulso (apretada de Espacio)
+const TORCH_IMPULSE_KICK = 6.2;  // fuerza del impulso vertical por apretada
+const TORCH_MOVE_SPEED = 4.2;    // empujón manual extra con las flechas (izq/der)
+let torch, flamePowerUps, revivePickup, torchShots, keys2;
+let torchImpulsePending = false; // se activa con cada apretada de Espacio (borde, no mantenida)
+let torchCruiseSpeed = 0;        // velocidad horizontal "de crucero", se adapta sola a la de Spiderman
+let lastPlayerVX = 0;            // velocidad horizontal real de Spiderman en el frame actual
+
+// ---------- modo solo Antorcha Humana (1 jugador, elegible desde el menú) ----------
+// personaje elegido para jugar en modo 1 jugador; en modo 2P se ignora (siempre
+// Spiderman + Antorcha como jugador 2, igual que hoy)
+let soloCharacter = 'spiderman'; // 'spiderman' | 'torch'
+const SOLO_TORCH_BASE_SPEED = 2.4;     // velocidad de avance automático al arrancar
+const SOLO_TORCH_MAX_SPEED = 6.2;      // tope para que no se vuelva injugable
+const SOLO_TORCH_SPEED_GROWTH = 0.0018; // cuánto acelera por cada metro de progreso (progressM)
 
 let groundY, cameraX, buildings, powerUps, enemies, climbers, sandHands, rhinos, scorpions, poisonBolts, helicopters, webShots, player, web, keys, score, best = 0, running = false, gameOver = false;
 // vida callejera decorativa (no interfiere con la jugabilidad): árboles, gente paseando, autos
@@ -382,6 +479,46 @@ function renderSkinPicker(){
   });
 }
 renderSkinPicker();
+
+// ---------- selector de personaje (solo 1 jugador, mobile y PC) ----------
+function renderCharacterPicker(){
+  document.querySelectorAll('.char-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.char === soloCharacter);
+  });
+}
+document.querySelectorAll('.char-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    const picker = document.getElementById('characterPicker');
+    if (picker && picker.classList.contains('disabled')) return; // 2P activado: no aplica
+    soloCharacter = b.dataset.char;
+    renderCharacterPicker();
+  });
+});
+renderCharacterPicker();
+
+// con el modo 2P activado el selector de personaje no aplica (siempre es
+// Spiderman + Antorcha como jugador 2), así que se ve deshabilitado
+function updateCharacterPickerEnabled(){
+  const tpCheckbox = document.getElementById('twoPlayerCheckbox');
+  const picker = document.getElementById('characterPicker');
+  const note = document.getElementById('characterPickerNote');
+  const isTwoP = !!(tpCheckbox && tpCheckbox.checked);
+  if (picker) picker.classList.toggle('disabled', isTwoP);
+  if (note) note.classList.toggle('show', isTwoP);
+}
+const twoPlayerCheckboxEl = document.getElementById('twoPlayerCheckbox');
+if (twoPlayerCheckboxEl) twoPlayerCheckboxEl.addEventListener('change', updateCharacterPickerEnabled);
+updateCharacterPickerEnabled();
+
+// el modo 2 jugadores necesita teclado (WASD/flechas/Espacio): en dispositivos
+// solo-táctiles no tiene sentido ofrecerlo, así que se oculta el casillero
+(function hideTwoPlayerOnTouch(){
+  const isTouchOnly = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+  if (isTouchOnly){
+    const el = document.getElementById('twoPlayerLabel');
+    if (el) el.style.display = 'none';
+  }
+})();
 
 // ---------- logros (persistidos entre partidas) ----------
 let stats = {
@@ -595,6 +732,10 @@ function initGame(){
   nextHeliAt = 0;
   web = { active:false, anchor:null, len:0 };
   keys = { left:false, right:false };
+  keys2 = { left:false, right:false, thrust:false };
+  flamePowerUps = [];
+  revivePickup = null;
+  torchShots = [];
   pumpVel = 0;
   missMarker = null;
   webThrow = null;
@@ -622,13 +763,41 @@ function initGame(){
   canLand = true;
   player = {
     x: first.x + first.width/2, y: groundY - first.height - 14,
-    px: 0, py: 0, radius: 14, grounded: true, facing: 1, autoShoot: false, autoShootTimer: 0, shootCooldown: 0, extraLives: 0, riding: null, flowCombo: 0, attachFrame: 0, attachX: 0
+    px: 0, py: 0, radius: 14, grounded: true, facing: 1, autoShoot: false, autoShootTimer: 0, shootCooldown: 0, extraLives: 0, riding: null, flowCombo: 0, attachFrame: 0, attachX: 0, alive: true
   };
   player.px = player.x; player.py = player.y;
+
+  // Antorcha Humana (jugador 2 en 2P, o EL personaje en modo solo Antorcha) —
+  // se inicializa siempre, es inofensivo si no participa (nunca se
+  // dibuja/actualiza/colisiona fuera de esos dos modos)
+  torch = {
+    x: first.x + first.width/2 + 70, y: groundY - first.height - 60,
+    px: 0, py: 0, radius: 14, alive: true, energy: TORCH_MAX_ENERGY,
+    extraLives: 0, autoShoot: false, autoShootTimer: 0, shootCooldown: 0, facing: 1,
+    angle: 0, velSmoothX: 0, velSmoothY: 0
+  };
+  torch.px = torch.x; torch.py = torch.y;
+  torchImpulsePending = false;
+  torchCruiseSpeed = 0;
+  lastPlayerVX = 0;
+
+  // modo solo Antorcha: Spiderman queda completamente inerte (no se dibuja,
+  // no se actualiza, no colisiona con nada) — la Antorcha pasa a ser EL personaje
+  const soloTorchMode = !twoPlayerMode && soloCharacter === 'torch';
+  if (soloTorchMode) player.alive = false;
+
   updateLifeHud();
   updateAutoShootHud();
   const flowEl0 = document.getElementById('flowIndicator');
   if (flowEl0) flowEl0.style.display = 'none';
+
+  updateTorchHud();
+  updateTorchEnergyHud();
+  updateTorchAutoShootHud();
+  const hud2El = document.getElementById('hud2');
+  if (hud2El) hud2El.style.display = twoPlayerMode ? 'flex' : 'none';
+  const soloEnergyEl = document.getElementById('soloTorchEnergyIndicator');
+  if (soloEnergyEl) soloEnergyEl.style.display = soloTorchMode ? 'inline' : 'none';
 
   gameOver = false;
   document.getElementById('overlay').classList.remove('show');
@@ -747,6 +916,86 @@ function ensurePowerUps(){
   powerUps = powerUps.filter(p => p.x > cameraX - 200);
 }
 
+// llamita exclusiva del modo 2P: recarga la energía de la Antorcha Humana.
+// mismo patrón de streaming que ensurePowerUps(), pero solo existe en modo 2P.
+// Aparece bastante seguido a propósito: administrar los impulsos de vuelo ya
+// es difícil de por sí, así que la recarga no debería ser el cuello de botella.
+function ensureFlamePowerUps(){
+  if (!twoPlayerMode && soloCharacter !== 'torch'){ flamePowerUps = []; return; }
+  let lastX = flamePowerUps.length ? flamePowerUps[flamePowerUps.length-1].x : 500;
+  while (lastX < cameraX + W + 700){
+    lastX += 230 + Math.random()*180;
+    const y = groundY - (H*0.28 + Math.random()*H*0.4);
+    flamePowerUps.push({ x:lastX, y });
+  }
+  flamePowerUps = flamePowerUps.filter(p => p.x > cameraX - 200);
+}
+
+// power-up de revivir (modo 2P): aparece solo mientras exactamente un personaje
+// está muerto y el otro sigue jugando. Temática según quién murió.
+function ensureRevivePickup(){
+  if (!twoPlayerMode){ revivePickup = null; return; }
+  const exactlyOneDead = player.alive !== torch.alive;
+  if (!exactlyOneDead){ revivePickup = null; return; }
+  if (revivePickup) return; // ya está en el mapa, esperando a que lo agarren
+  const survivor = player.alive ? player : torch;
+  revivePickup = {
+    type: player.alive ? 'torch' : 'player',
+    x: survivor.x + 260 + Math.random()*160,
+    y: groundY - (H*0.3 + Math.random()*H*0.3)
+  };
+}
+
+// revive al personaje muerto si el sobreviviente toca el power-up de revivir.
+// Es un ítem crítico (sin él el compañero queda muerto toda la partida), así que
+// el "imán" lo acerca solo si el sobreviviente pasa cerca, y el radio de contacto
+// es bien generoso — no depende de acertarle justo con el cuerpo o la telaraña.
+function tryReviveCollision(){
+  if (!twoPlayerMode || !revivePickup) return;
+  const survivor = player.alive ? player : (torch.alive ? torch : null);
+  if (!survivor) return;
+  const dx = survivor.x - revivePickup.x, dy = survivor.y - revivePickup.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 220){
+    // imán: lo va acercando de a poco hacia el sobreviviente
+    revivePickup.x += dx * 0.05;
+    revivePickup.y += dy * 0.05;
+  }
+  let touched = dist < survivor.radius + 40;
+  // igual que con el resto de los power-ups: si el sobreviviente es Spiderman,
+  // también cuenta si lo toca con el hilo de la telaraña tendida (no hace falta
+  // que el cuerpo llegue exacto hasta el ícono)
+  if (!touched && survivor === player && web.active){
+    touched = pointToSegmentDist(revivePickup.x, revivePickup.y, player.x, player.y, web.anchor.x, web.anchor.y) < 30;
+  }
+  if (touched){
+    if (revivePickup.type === 'player'){
+      player.alive = true;
+      player.x = survivor.x - 40; player.y = survivor.y - 10;
+      player.px = player.x; player.py = player.y;
+      player.grounded = false;
+      updateLifeHud();
+      pickupMsg = { text: '¡Spiderman revivió! 🕸️', timer: 80 };
+    } else {
+      torch.alive = true;
+      torch.x = survivor.x + 40; torch.y = survivor.y - 10;
+      torch.px = torch.x; torch.py = torch.y;
+      torch.energy = TORCH_MAX_ENERGY;
+      updateTorchHud();
+      updateTorchEnergyHud();
+      pickupMsg = { text: '¡La Antorcha revivió! 🔥', timer: 80 };
+    }
+    revivePickup = null;
+  }
+}
+
+// termina la partida solo cuando ambos personajes están muertos (modo 2P);
+// en 1P la muerte del jugador ya dispara triggerGameOver() directamente
+function checkBothDead(){
+  if (!twoPlayerMode) return;
+  if (!player.alive && !torch.alive) triggerGameOver();
+}
+
 // distancia mínima de un punto a un segmento (para detectar si la telaraña "roza" algo)
 function pointToSegmentDist(px, py, x1, y1, x2, y2){
   const dx = x2 - x1, dy = y2 - y1;
@@ -757,32 +1006,61 @@ function pointToSegmentDist(px, py, x1, y1, x2, y2){
   return Math.hypot(px-cx, py-cy);
 }
 
-function applyPowerUp(type){
+function applyPowerUp(type, who){
+  who = who || 'p1';
+  // el súper salto lo puede agarrar cualquiera de los dos personajes, pero
+  // siempre se activa para los dos a la vez (así ninguno se queda atrás)
   if (type === 'jump'){
-    web.active = false; // corta el swing para que el impulso se aplique limpio
-    player.px = player.x - 15;
-    player.py = player.y + 19;
+    if (player.alive){
+      web.active = false; // corta el swing para que el impulso se aplique limpio
+      player.px = player.x - 15;
+      player.py = player.y + 19;
+    }
+    if ((twoPlayerMode || (!twoPlayerMode && soloCharacter === 'torch')) && torch.alive){
+      torch.py = torch.y + 19;
+      torch.energy = Math.min(TORCH_MAX_ENERGY, torch.energy + 30);
+      updateTorchEnergyHud();
+    }
     pickupMsg = { text: '¡Súper salto! 🚀', timer: 70 };
-  } else if (type === 'shoot'){
-    // no toca la telaraña: podés seguir colgado y disparando al mismo tiempo
-    player.autoShoot = true;
-    player.autoShootTimer = AUTO_SHOOT_DURATION;
-    pickupMsg = { text: '¡Disparo automático! 🕸️', timer: 70 };
-    updateAutoShootHud();
-  } else if (type === 'life'){
-    // no toca la telaraña: si estabas colgado, seguís colgado normalmente
-    player.extraLives++;
-    pickupMsg = { text: '¡Vida extra! Ahora tenés ' + player.extraLives + ' ❤️', timer: 70 };
-    updateLifeHud();
+    return;
+  }
+  if (who === 'p1'){
+    if (type === 'shoot'){
+      // no toca la telaraña: podés seguir colgado y disparando al mismo tiempo
+      player.autoShoot = true;
+      player.autoShootTimer = AUTO_SHOOT_DURATION;
+      pickupMsg = { text: '¡Disparo automático! 🕸️', timer: 70 };
+      updateAutoShootHud();
+    } else if (type === 'life'){
+      // no toca la telaraña: si estabas colgado, seguís colgado normalmente
+      player.extraLives++;
+      pickupMsg = { text: '¡Vida extra! Ahora tenés ' + player.extraLives + ' ❤️', timer: 70 };
+      updateLifeHud();
+    }
+  } else { // 'torch' — Antorcha Humana, jugador 2
+    if (type === 'shoot'){
+      torch.autoShoot = true;
+      torch.autoShootTimer = AUTO_SHOOT_DURATION;
+      pickupMsg = { text: '¡Disparo de fuego automático! 🔥', timer: 70 };
+      updateTorchAutoShootHud();
+    } else if (type === 'life'){
+      torch.extraLives++;
+      pickupMsg = { text: '¡Vida extra para la Antorcha! Ahora tiene ' + torch.extraLives + ' ❤️', timer: 70 };
+      updateTorchHud();
+    }
   }
 }
 
+// en modo solo Antorcha, el HUD principal (#hud) muestra las estadísticas de
+// la Antorcha en vez de las de Spiderman (que está inerte); en todo otro modo
+// sigue mostrando las de Spiderman, exactamente como siempre
 function updateLifeHud(){
   const el = document.getElementById('lifeIndicator');
   if (!el) return;
-  if (player.extraLives > 0){
+  const src = (!twoPlayerMode && soloCharacter === 'torch' && torch) ? torch : player;
+  if (src.extraLives > 0){
     el.style.display = 'inline';
-    el.textContent = '❤️ x' + player.extraLives;
+    el.textContent = '❤️ x' + src.extraLives;
   } else {
     el.style.display = 'none';
   }
@@ -792,12 +1070,51 @@ function updateLifeHud(){
 function updateAutoShootHud(){
   const el = document.getElementById('autoShootIndicator');
   if (!el) return;
-  if (player.autoShoot && player.autoShootTimer > 0){
+  const src = (!twoPlayerMode && soloCharacter === 'torch' && torch) ? torch : player;
+  if (src.autoShoot && src.autoShootTimer > 0){
     el.style.display = 'inline';
-    el.textContent = '🕸️ ' + Math.ceil(player.autoShootTimer / 60) + 's';
+    el.textContent = (src === torch ? '🔥 ' : '🕸️ ') + Math.ceil(src.autoShootTimer / 60) + 's';
   } else {
     el.style.display = 'none';
   }
+}
+
+// ---------- HUD de la Antorcha Humana (jugador 2 en 2P, o único personaje en
+// modo solo Antorcha) ----------
+// #torchEnergy/etc viven en #hud2 (solo visible en 2P); cuando la Antorcha es
+// el único personaje (modo solo Antorcha), además se reflejan en #hud (HUD
+// principal) y en updateLifeHud()/updateAutoShootHud() de arriba.
+function updateTorchEnergyHud(){
+  const el = document.getElementById('torchEnergy');
+  if (el && torch) el.textContent = Math.round(torch.energy);
+  if (!twoPlayerMode && soloCharacter === 'torch'){
+    const el2 = document.getElementById('soloTorchEnergyValue');
+    if (el2 && torch) el2.textContent = Math.round(torch.energy);
+  }
+}
+function updateTorchHud(){
+  const el = document.getElementById('torchLifeIndicator');
+  if (el && torch){
+    if (torch.extraLives > 0){
+      el.style.display = 'inline';
+      el.textContent = '❤️ x' + torch.extraLives;
+    } else {
+      el.style.display = 'none';
+    }
+  }
+  if (!twoPlayerMode && soloCharacter === 'torch') updateLifeHud();
+}
+function updateTorchAutoShootHud(){
+  const el = document.getElementById('torchAutoShootIndicator');
+  if (el && torch){
+    if (torch.autoShoot && torch.autoShootTimer > 0){
+      el.style.display = 'inline';
+      el.textContent = '🔥 ' + Math.ceil(torch.autoShootTimer / 60) + 's';
+    } else {
+      el.style.display = 'none';
+    }
+  }
+  if (!twoPlayerMode && soloCharacter === 'torch') updateAutoShootHud();
 }
 
 // dificultad progresiva: nada al principio, después va apareciendo y cada vez más seguido
@@ -1075,17 +1392,25 @@ function releaseWeb(){
 let pointerDown = false;
 canvas.addEventListener('pointerdown', e => {
   pointerDown = true;
+  if (!twoPlayerMode && soloCharacter === 'torch'){
+    // modo solo Antorcha: tocar/clickear en cualquier lado da el impulso hacia
+    // arriba (no hay telaraña que apuntar, Spiderman está inerte)
+    torchImpulsePending = true;
+    return;
+  }
   if (player.grounded){
     // se deja caer del edificio, sin impulso: la física de caída libre hace el resto
     player.grounded = false;
     canLand = false;
   }
-  tryShootWeb(e.clientX, e.clientY);
+  const c = clientToCanvas(e.clientX, e.clientY);
+  tryShootWeb(c.x, c.y);
 });
 addEventListener('pointerup', () => { pointerDown = false; releaseWeb(); });
 addEventListener('pointermove', e => {
   if (pointerDown) { /* mantiene el web actual, no reapunta hasta soltar */ }
-  mouseX = e.clientX; mouseY = e.clientY;
+  const c = clientToCanvas(e.clientX, e.clientY);
+  mouseX = c.x; mouseY = c.y;
 });
 // bloqueo extra de los gestos táctiles nativos del canvas: en iOS Safari, mantener
 // presionado puede disparar la lupa de selección de texto aunque haya touch-action/user-select
@@ -1108,21 +1433,58 @@ let prevMouseX = mouseX, prevMouseY = mouseY;
 const ROPE_ADJUST_RANGE = 55; // cuánto se puede alargar/achicar como máximo desde el enganche original
 
 addEventListener('keydown', e => {
-  if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
-  if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
-  if (e.code === 'Space' || e.code === 'ArrowUp'){
-    if (player.grounded){
-      player.py = player.y - JUMP_VY;
-      player.grounded = false;
-      canLand = false;
+  if (twoPlayerMode){
+    // en modo 2P, Spiderman se remapea a WASD para liberar las flechas y Espacio
+    // para la Antorcha Humana (jugador 2)
+    if (e.code === 'KeyA') keys.left = true;
+    if (e.code === 'KeyD') keys.right = true;
+    if (e.code === 'KeyW'){
+      if (player.grounded){
+        player.py = player.y - JUMP_VY;
+        player.grounded = false;
+        canLand = false;
+      }
+    }
+    if (e.code === 'ArrowLeft') keys2.left = true;
+    if (e.code === 'ArrowRight') keys2.right = true;
+    if (e.code === 'Space'){
+      // impulso, no propulsión mantenida: cada apretada da un empujón y hay que
+      // soltar para volver a impulsar (e.repeat filtra el auto-repeat del SO)
+      if (!e.repeat) torchImpulsePending = true;
+      e.preventDefault();
+    }
+  } else if (soloCharacter === 'torch'){
+    // modo solo Antorcha (1 jugador): sin control horizontal manual (avanza
+    // sola), Espacio da el mismo impulso vertical que en 2P
+    if (e.code === 'Space'){
+      if (!e.repeat) torchImpulsePending = true;
+      e.preventDefault();
+    }
+  } else {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+    if (e.code === 'Space' || e.code === 'ArrowUp'){
+      if (player.grounded){
+        player.py = player.y - JUMP_VY;
+        player.grounded = false;
+        canLand = false;
+      }
     }
   }
   if (e.code === 'Enter' && gameOver) restart();
   if ((e.code === 'Escape' || e.code === 'KeyP') && !gameOver) togglePause();
 });
 addEventListener('keyup', e => {
-  if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
-  if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+  if (twoPlayerMode){
+    if (e.code === 'KeyA') keys.left = false;
+    if (e.code === 'KeyD') keys.right = false;
+    if (e.code === 'ArrowLeft') keys2.left = false;
+    if (e.code === 'ArrowRight') keys2.right = false;
+    if (e.code === 'Space') keys2.thrust = false;
+  } else {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+  }
 });
 
 document.getElementById('restartBtn').addEventListener('click', restart);
@@ -1131,6 +1493,8 @@ document.getElementById('menuFromDeathBtn').addEventListener('click', () => {
   showMenu();
 });
 document.getElementById('startBtn').addEventListener('click', () => {
+  const tpCheckbox = document.getElementById('twoPlayerCheckbox');
+  twoPlayerMode = !!(tpCheckbox && tpCheckbox.checked);
   document.getElementById('startOverlay').style.display = 'none';
   document.getElementById('hud').style.display = 'flex';
   document.getElementById('pauseBtn').style.display = 'flex';
@@ -1160,6 +1524,8 @@ function showMenu(){
   document.getElementById('pauseOverlay').classList.remove('show');
   document.getElementById('overlay').classList.remove('show');
   document.getElementById('hud').style.display = 'none';
+  const hud2El = document.getElementById('hud2');
+  if (hud2El) hud2El.style.display = 'none';
   document.getElementById('pauseBtn').style.display = 'none';
   document.getElementById('startOverlay').style.display = 'flex';
   renderSkinPicker();
@@ -1170,6 +1536,15 @@ function restart(){
 }
 
 // ---------- física / update ----------
+// posición "activa" que gobierna cámara/progreso/logros: la de Spiderman en 1P
+// clásico y en 2P, la de la Antorcha en modo solo Antorcha (Spiderman está inerte)
+function activeX(){
+  return (!twoPlayerMode && soloCharacter === 'torch') ? torch.x : player.x;
+}
+function activeY(){
+  return (!twoPlayerMode && soloCharacter === 'torch') ? torch.y : player.y;
+}
+
 function update(){
   if (gameOver) return;
 
@@ -1182,8 +1557,9 @@ function update(){
   }
 
   // metros de progreso: gobierna la dificultad (frecuencia/agresividad de enemigos)
-  progressM = Math.max(progressM, Math.floor((player.x - startBuilding.x) / 10));
+  progressM = Math.max(progressM, Math.floor((activeX() - startBuilding.x) / 10));
 
+  if (player.alive){
   let vx = player.x - player.px;
   let vy = player.y - player.py;
 
@@ -1249,26 +1625,107 @@ function update(){
     player.x -= dx * diff;
     player.y -= dy * diff;
   }
+  lastPlayerVX = player.x - player.px; // velocidad real de Spiderman este frame (post-telaraña)
   } // fin del bloque de física normal (else de player.riding)
+  } // fin del bloque activo de Spiderman (player.alive) — en 1P siempre true
+
+  // ---------- física / control de la Antorcha Humana ----------
+  // válido en dos modos: 2P (jugador 2, control manual con flechas + crucero
+  // atado a Spiderman) o modo solo Antorcha (avance automático continuo, sin
+  // control horizontal). En ambos, cada apretada de Espacio da un IMPULSO
+  // vertical (no hace falta ni sirve mantenerla apretada) — hay que dosificar
+  // los impulsos para no gastar energía de más.
+  const soloTorchActive = !twoPlayerMode && soloCharacter === 'torch';
+  if ((twoPlayerMode || soloTorchActive) && torch.alive){
+    let tvx = torch.x - torch.px, tvy = torch.y - torch.py;
+    torch.px = torch.x; torch.py = torch.y;
+    tvx *= DAMPING; tvy *= DAMPING;
+    const tay = GRAVITY;
+
+    if (torchImpulsePending){
+      torchImpulsePending = false;
+      if (torch.energy > 0){
+        tvy -= TORCH_IMPULSE_KICK;
+        torch.energy = Math.max(0, torch.energy - TORCH_IMPULSE_COST);
+        torch.flameFX = 12; // frames de llamarada visible del propulsor
+        updateTorchEnergyHud();
+      }
+    }
+
+    torch.x += tvx;
+    torch.y += tvy + tay;
+
+    let drift;
+    if (soloTorchActive){
+      // modo solo Antorcha: auto-avance continuo, sin control horizontal manual;
+      // la velocidad crece de a poco con la distancia recorrida (mismo patrón
+      // que la dificultad de los enemigos vía progressM), con un tope duro
+      drift = Math.min(SOLO_TORCH_MAX_SPEED, SOLO_TORCH_BASE_SPEED + progressM * SOLO_TORCH_SPEED_GROWTH);
+    } else {
+      // modo 2P: velocidad de crucero que se acerca de a poco a la velocidad
+      // horizontal real de Spiderman (lastPlayerVX), más el empujón manual
+      // de las flechas
+      torchCruiseSpeed += (lastPlayerVX - torchCruiseSpeed) * 0.05;
+      drift = torchCruiseSpeed;
+      if (keys2.left) drift -= TORCH_MOVE_SPEED;
+      if (keys2.right) drift += TORCH_MOVE_SPEED;
+    }
+    // se aplica como desplazamiento directo (no como "velocidad" del sistema
+    // verlet), para que no se lea como impulso extra y se acumule frame a frame.
+    torch.x += drift; torch.px += drift;
+
+    if (drift > 0.05) torch.facing = 1;
+    if (drift < -0.05) torch.facing = -1;
+    if (torch.flameFX > 0) torch.flameFX--;
+
+    // ángulo de vuelo: acostada hacia el lado cuando predomina el movimiento
+    // horizontal, parada (para arriba o para abajo, según corresponda) cuando
+    // predomina el vertical — suavizado para que no tiemble frame a frame
+    torch.velSmoothX += (drift - torch.velSmoothX) * 0.15;
+    torch.velSmoothY += ((tvy + tay) - torch.velSmoothY) * 0.15;
+    torch.angle = Math.atan2(torch.velSmoothX, -torch.velSmoothY);
+  }
 
   // altura máxima alcanzada en esta partida (para el logro de altura)
-  sessionMaxHeightPx = Math.max(sessionMaxHeightPx, groundY - player.y);
+  sessionMaxHeightPx = Math.max(sessionMaxHeightPx, groundY - activeY());
 
   // recolectar power-ups flotantes: con el cuerpo, o con el hilo de la telaraña
   // mientras está tendida (así no hace falta apuntar el cuerpo exacto a la skill)
   for (let i = powerUps.length - 1; i >= 0; i--){
     const p = powerUps[i];
-    let touched = Math.hypot(player.x - p.x, player.y - p.y) < player.radius + 17;
-    if (!touched && web.active){
+    let touched = player.alive && Math.hypot(player.x - p.x, player.y - p.y) < player.radius + 17;
+    if (!touched && player.alive && web.active){
       touched = pointToSegmentDist(p.x, p.y, player.x, player.y, web.anchor.x, web.anchor.y) < 17;
     }
+    let touchedBy = touched ? 'p1' : null;
+    // el súper salto lo puede agarrar cualquiera de los dos (se activa para
+    // los dos al mismo tiempo, ver applyPowerUp); disparo y vida extra siguen
+    // siendo individuales de quien los agarra
+    if (!touched && (twoPlayerMode || soloCharacter === 'torch') && torch.alive){
+      touched = Math.hypot(torch.x - p.x, torch.y - p.y) < torch.radius + 17;
+      if (touched) touchedBy = 'torch';
+    }
     if (touched){
-      applyPowerUp(p.type);
+      applyPowerUp(p.type, touchedBy);
       powerUps.splice(i, 1);
       stats.totalPowerUps++;
       saveStats();
     }
   }
+
+  // llamita: recarga la energía de la Antorcha. Existe en 2P y en modo solo Antorcha.
+  for (let i = flamePowerUps.length - 1; i >= 0; i--){
+    const p = flamePowerUps[i];
+    if ((twoPlayerMode || soloCharacter === 'torch') && torch.alive && Math.hypot(torch.x - p.x, torch.y - p.y) < torch.radius + 17){
+      torch.energy = TORCH_MAX_ENERGY;
+      updateTorchEnergyHud();
+      pickupMsg = { text: '¡Energía de la Antorcha recargada! 🔥', timer: 70 };
+      flamePowerUps.splice(i, 1);
+    }
+  }
+
+  ensureRevivePickup();
+  tryReviveCollision();
   if (pickupMsg){
     pickupMsg.timer--;
     if (pickupMsg.timer <= 0) pickupMsg = null;
@@ -1284,11 +1741,11 @@ function update(){
 
   // disparo automático (power-up de "disparo"): mientras esté activo, busca un
   // enemigo visible en pantalla y solo dispara cuando encuentra uno, apuntando a él
-  function findAutoShootTarget(){
+  function findAutoShootTarget(originX, originY){
     let best = null, bestDist = Infinity;
     const consider = (x, y) => {
       if (x < cameraX - 60 || x > cameraX + W + 60) return; // tiene que estar a la vista
-      const d = Math.hypot(x - player.x, y - player.y);
+      const d = Math.hypot(x - originX, y - originY);
       if (d < bestDist){ bestDist = d; best = { x, y }; }
     };
     for (const en of enemies) if (!en.hit) consider(en.drawX !== undefined ? en.drawX : en.x, en.y);
@@ -1299,7 +1756,7 @@ function update(){
     return best;
   }
 
-  if (player.autoShoot){
+  if (player.alive && player.autoShoot){
     player.autoShootTimer--;
     updateAutoShootHud();
     if (player.autoShootTimer <= 0){
@@ -1308,7 +1765,7 @@ function update(){
     } else if (player.shootCooldown > 0){
       player.shootCooldown--;
     } else {
-      const tgt = findAutoShootTarget();
+      const tgt = findAutoShootTarget(player.x, player.y);
       if (tgt){
         player.shootCooldown = AUTO_SHOOT_COOLDOWN;
         const dx = tgt.x - player.x, dy = tgt.y - player.y;
@@ -1317,6 +1774,28 @@ function update(){
         webShots.push({ x: player.x, y: player.y, vx: dx/d*speed, vy: dy/d*speed, life: 90 });
       }
       // si no hay ningún enemigo a la vista, no dispara — vuelve a chequear el próximo frame
+    }
+  }
+
+  // disparo automático de la Antorcha (2P, o modo solo Antorcha): mismo patrón
+  // que el de Spiderman, pero con proyectiles de fuego propios (torchShots)
+  if ((twoPlayerMode || soloCharacter === 'torch') && torch.alive && torch.autoShoot){
+    torch.autoShootTimer--;
+    updateTorchAutoShootHud();
+    if (torch.autoShootTimer <= 0){
+      torch.autoShoot = false;
+      updateTorchAutoShootHud();
+    } else if (torch.shootCooldown > 0){
+      torch.shootCooldown--;
+    } else {
+      const tgt = findAutoShootTarget(torch.x, torch.y);
+      if (tgt){
+        torch.shootCooldown = AUTO_SHOOT_COOLDOWN;
+        const dx = tgt.x - torch.x, dy = tgt.y - torch.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const speed = 9;
+        torchShots.push({ x: torch.x, y: torch.y, vx: dx/d*speed, vy: dy/d*speed, life: 90 });
+      }
     }
   }
 
@@ -1371,21 +1850,43 @@ function update(){
     }
   }
 
-  // resuelve el golpe con cualquier enemigo: usa una vida extra si hay, si no termina la partida
-  function resolveEnemyHit(defeatMsg, failTitle){
-    if (player.extraLives > 0){
-      player.extraLives--;
+  for (let i = torchShots.length - 1; i >= 0; i--){
+    const w = torchShots[i];
+    w.x += w.vx; w.y += w.vy;
+    w.life--;
+    if (tryDefeatNear(w.x, w.y, 14) || w.life <= 0 ||
+        w.x < cameraX - 100 || w.x > cameraX + W + 200){
+      torchShots.splice(i, 1);
+    }
+  }
+
+  // resuelve el golpe con cualquier enemigo para el personaje indicado ('p1' o
+  // 'torch'): usa una vida extra si tiene, si no lo marca muerto (en 1P, o si es
+  // Spiderman con el modo 2P apagado, termina la partida directamente — igual que antes)
+  function resolveCharacterHit(who, defeatMsg, failTitle){
+    const isP1 = who === 'p1';
+    const ch = isP1 ? player : torch;
+    if (ch.extraLives > 0){
+      ch.extraLives--;
       stats.extraLifeUses++;
       stats.enemiesDefeated++;
       saveStats();
-      player.py = player.y + 24;
-      player.px = player.x - 12;
+      ch.py = ch.y + 24;
+      ch.px = ch.x - 12;
       pickupMsg = { text: defeatMsg, timer: 70 };
-      updateLifeHud();
+      if (isP1) updateLifeHud(); else updateTorchHud();
       return true; // derrotado: hay que sacarlo del mapa
-    } else {
+    } else if (!twoPlayerMode){
+      // en 1 jugador (Spiderman o Antorcha solo) hay un único personaje en
+      // juego, sin revivir: cualquiera de los dos termina la partida directo
       deathTitle = failTitle;
       triggerGameOver();
+      return false;
+    } else {
+      ch.alive = false;
+      deathTitle = failTitle;
+      if (isP1) updateLifeHud(); else updateTorchHud();
+      checkBothDead();
       return false;
     }
   }
@@ -1395,10 +1896,15 @@ function update(){
   for (const en of enemies){
     en.y = en.baseY + Math.sin(t*0.8 + en.phase) * 26;
     en.drawX = en.x + Math.sin(t*0.5 + en.phase) * 40;
-    if (!en.hit && Math.hypot(player.x - en.drawX, player.y - en.y) < player.radius + 15){
+    if (player.alive && !en.hit && Math.hypot(player.x - en.drawX, player.y - en.y) < player.radius + 15){
       en.hit = true;
       registerEnemyType('goblin');
-      if (resolveEnemyHit('¡Derrotaste al villano! ❤️', '🦹 El villano volador te atrapó')) en.defeated = true;
+      if (resolveCharacterHit('p1', '¡Derrotaste al villano! ❤️', '🦹 El villano volador te atrapó')) en.defeated = true;
+    }
+    if ((twoPlayerMode || soloCharacter === 'torch') && torch.alive && !en.hit && Math.hypot(torch.x - en.drawX, torch.y - en.y) < torch.radius + 15){
+      en.hit = true;
+      registerEnemyType('goblin');
+      if (resolveCharacterHit('torch', '¡La Antorcha derrotó al villano! ❤️', '🦹 El villano volador atrapó a la Antorcha')) en.defeated = true;
     }
   }
   enemies = enemies.filter(en => !en.defeated);
@@ -1407,10 +1913,15 @@ function update(){
   for (const c of climbers){
     const raw = c.baseY + Math.sin(t*c.speed + c.phase) * c.climbRange;
     c.y = Math.max(c.wallTop, Math.min(c.wallBottom, raw));
-    if (!c.hit && Math.hypot(player.x - c.x, player.y - c.y) < player.radius + 26){
+    if (player.alive && !c.hit && Math.hypot(player.x - c.x, player.y - c.y) < player.radius + 26){
       c.hit = true;
       registerEnemyType('climber');
-      if (resolveEnemyHit('¡Esquivaste al trepador! ❤️', '🦾 El trepador mecánico te atrapó')) c.defeated = true;
+      if (resolveCharacterHit('p1', '¡Esquivaste al trepador! ❤️', '🦾 El trepador mecánico te atrapó')) c.defeated = true;
+    }
+    if ((twoPlayerMode || soloCharacter === 'torch') && torch.alive && !c.hit && Math.hypot(torch.x - c.x, torch.y - c.y) < torch.radius + 26){
+      c.hit = true;
+      registerEnemyType('climber');
+      if (resolveCharacterHit('torch', '¡La Antorcha esquivó al trepador! ❤️', '🦾 El trepador mecánico atrapó a la Antorcha')) c.defeated = true;
     }
   }
   climbers = climbers.filter(c => !c.defeated);
@@ -1442,9 +1953,13 @@ function update(){
     s.heightFactor = heightFrac;
     s.alert = alert;
     s.topY = groundY - heightFrac * sandMaxReach;
-    if (!s.hit && heightFrac > 0.3 && Math.abs(player.x - s.x) < 55 && player.y >= s.topY - 12){
+    if (player.alive && !s.hit && heightFrac > 0.3 && Math.abs(player.x - s.x) < 55 && player.y >= s.topY - 12){
       s.hit = true;
-      if (resolveEnemyHit('¡Te escapaste de la mano de arena! ❤️', '✋ La mano de arena te atrapó')) s.defeated = true;
+      if (resolveCharacterHit('p1', '¡Te escapaste de la mano de arena! ❤️', '✋ La mano de arena te atrapó')) s.defeated = true;
+    }
+    if ((twoPlayerMode || soloCharacter === 'torch') && torch.alive && !s.hit && heightFrac > 0.3 && Math.abs(torch.x - s.x) < 55 && torch.y >= s.topY - 12){
+      s.hit = true;
+      if (resolveCharacterHit('torch', '¡La Antorcha se escapó de la mano de arena! ❤️', '✋ La mano de arena atrapó a la Antorcha')) s.defeated = true;
     }
   }
   sandHands = sandHands.filter(s => !s.defeated);
@@ -1453,22 +1968,28 @@ function update(){
   const rhinoZone = Math.min(150, 75 + Math.max(0, progressM - DIFF.rhinoStart) * 0.03);
   for (const r of rhinos){
     r.x += r.speed;
-    if (!r.hit && Math.abs(player.x - r.x) < 44 && player.y > groundY - rhinoZone){
+    if (player.alive && !r.hit && Math.abs(player.x - r.x) < 44 && player.y > groundY - rhinoZone){
       r.hit = true;
       registerEnemyType('rhino');
-      if (resolveEnemyHit('¡Esquivaste a Rhino! ❤️', '🦏 Rhino te llevó puesto')) r.defeated = true;
+      if (resolveCharacterHit('p1', '¡Esquivaste a Rhino! ❤️', '🦏 Rhino te llevó puesto')) r.defeated = true;
+    }
+    if ((twoPlayerMode || soloCharacter === 'torch') && torch.alive && !r.hit && Math.abs(torch.x - r.x) < 44 && torch.y > groundY - rhinoZone){
+      r.hit = true;
+      registerEnemyType('rhino');
+      if (resolveCharacterHit('torch', '¡La Antorcha esquivó a Rhino! ❤️', '🦏 Rhino atropelló a la Antorcha')) r.defeated = true;
     }
   }
   rhinos = rhinos.filter(r => !r.defeated);
 
-  // Escorpión: quieto en un techo, dispara veneno con la cola hacia el jugador
+  // Escorpión: quieto en un techo, dispara veneno con la cola hacia el
+  // personaje activo (Spiderman, o la Antorcha en modo solo Antorcha)
   for (const s of scorpions){
-    if (Math.abs(player.x - s.x) < 750){
+    if (Math.abs(activeX() - s.x) < 750){
       s.cooldown--;
       if (s.cooldown <= 0){
         s.cooldown = s.baseCooldown;
         registerEnemyType('scorpion');
-        const dx = player.x - s.x, dy = player.y - s.y;
+        const dx = activeX() - s.x, dy = activeY() - s.y;
         const dist = Math.hypot(dx, dy) || 1;
         const speed = 6.5;
         poisonBolts.push({ x:s.x, y:s.y, vx: dx/dist*speed, vy: dy/dist*speed - 1.4 });
@@ -1479,9 +2000,14 @@ function update(){
     const p = poisonBolts[i];
     p.vy += 0.1;
     p.x += p.vx; p.y += p.vy;
-    if (Math.hypot(player.x - p.x, player.y - p.y) < player.radius + 8){
+    if (player.alive && Math.hypot(player.x - p.x, player.y - p.y) < player.radius + 8){
       poisonBolts.splice(i, 1);
-      resolveEnemyHit('¡Esquivaste el veneno! ❤️', '🦂 El veneno de Escorpión te alcanzó');
+      resolveCharacterHit('p1', '¡Esquivaste el veneno! ❤️', '🦂 El veneno de Escorpión te alcanzó');
+      continue;
+    }
+    if ((twoPlayerMode || soloCharacter === 'torch') && torch.alive && Math.hypot(torch.x - p.x, torch.y - p.y) < torch.radius + 8){
+      poisonBolts.splice(i, 1);
+      resolveCharacterHit('torch', '¡La Antorcha esquivó el veneno! ❤️', '🦂 El veneno de Escorpión alcanzó a la Antorcha');
       continue;
     }
     if (p.x < cameraX - 100 || p.x > cameraX + W + 100 || p.y > groundY + 40){
@@ -1509,7 +2035,7 @@ function update(){
 
   // colisión con el techo del edificio inicial (único lugar donde se puede aterrizar)
   player.grounded = false;
-  if (canLand){
+  if (player.alive && canLand){
     const b = startBuilding;
     const top = groundY - b.height;
     const withinX = player.x + player.radius*0.6 > b.x && player.x - player.radius*0.6 < b.x + b.width;
@@ -1522,7 +2048,7 @@ function update(){
   }
 
   // muerte: tocar el piso (salvo que tengamos vida extra, ahí rebota)
-  if (player.y + player.radius >= groundY){
+  if (player.alive && player.y + player.radius >= groundY){
     if (player.extraLives > 0){
       player.extraLives--;
       stats.extraLifeUses++;
@@ -1535,19 +2061,51 @@ function update(){
     } else {
       player.y = groundY - player.radius;
       deathTitle = '💥 Tocaste el piso';
-      triggerGameOver();
+      if (twoPlayerMode){
+        player.alive = false;
+        checkBothDead();
+      } else {
+        triggerGameOver();
+      }
     }
   }
 
-  // la cámara sigue al jugador en las dos direcciones (no solo hacia adelante),
-  // así nunca queda afuera de pantalla al balancearse para atrás
-  const camTarget = Math.max(startBuilding.x - 120, player.x - W*0.35);
+  // muerte de la Antorcha: tocar el piso, salvo vida extra. En 2P el otro
+  // personaje puede seguir jugando (checkBothDead); en modo solo Antorcha
+  // (personaje único, sin revivir) termina la partida directamente, igual que
+  // Spiderman en el 1P clásico.
+  if ((twoPlayerMode || soloCharacter === 'torch') && torch.alive && torch.y + torch.radius >= groundY){
+    if (torch.extraLives > 0){
+      torch.extraLives--;
+      stats.extraLifeUses++;
+      saveStats();
+      torch.y = groundY - torch.radius - 4;
+      torch.py = torch.y + 26;
+      torch.px = torch.x - 8;
+      pickupMsg = { text: twoPlayerMode ? '¡Rebote de la Antorcha! Sigue en juego ❤️' : '¡Rebote! Seguís en juego ❤️', timer: 70 };
+      updateTorchHud();
+    } else {
+      torch.y = groundY - torch.radius;
+      deathTitle = '💥 Tocaste el piso';
+      if (twoPlayerMode){
+        torch.alive = false;
+        updateTorchHud();
+        checkBothDead();
+      } else {
+        triggerGameOver();
+      }
+    }
+  }
+
+  // la cámara sigue al personaje activo en las dos direcciones (no solo hacia
+  // adelante), así nunca queda afuera de pantalla al balancearse para atrás
+  const camTarget = Math.max(startBuilding.x - 120, activeX() - W*0.35);
   cameraX += (camTarget - cameraX) * 0.18;
   ensureBuildings();
 
   // registrar los edificios temáticos que ya pasaste (para los logros de Nueva York)
   for (const b of buildings){
-    if (b.landmark && !b.landmarkCounted && player.x > b.x + b.width){
+    if (b.landmark && !b.landmarkCounted && activeX() > b.x + b.width){
       b.landmarkCounted = true;
       stats.landmarkCounts[b.landmark] = (stats.landmarkCounts[b.landmark] || 0) + 1;
       saveStats();
@@ -1557,6 +2115,7 @@ function update(){
   updatePigeons();
   updateStreetLife();
   ensurePowerUps();
+  ensureFlamePowerUps();
   ensureEnemies();
   ensureClimbers();
   ensureSandHands();
@@ -1564,7 +2123,7 @@ function update(){
   ensureScorpions();
   ensureHelicopter();
 
-  score = Math.max(score, Math.floor((player.x - startBuilding.x) / 10));
+  score = Math.max(score, Math.floor((activeX() - startBuilding.x) / 10));
   document.getElementById('score').textContent = score;
   if (score > best){ best = score; document.getElementById('best').textContent = best; }
 }
@@ -2035,6 +2594,7 @@ function drawBuildings(){
 }
 
 function drawWeb(){
+  if (!player.alive) return; // inerte en modo solo Antorcha: no dibuja telaraña ni mira
   if (web.active){
     ctx.strokeStyle = 'rgba(255,255,255,.85)';
     ctx.lineWidth = 2;
@@ -2086,6 +2646,7 @@ function drawMissMarker(){
 }
 
 function drawPlayer(){
+  if (!player.alive) return;
   const px = player.x - cameraX, py = player.y;
   const dir = player.facing;
   const skin = SKINS[selectedSkin];
@@ -2172,6 +2733,86 @@ function drawPlayer(){
   ctx.restore();
 }
 
+// Antorcha Humana (jugador 2 en 2P, o único personaje en modo solo Antorcha):
+// silueta humanoide en llamas, diseño original, distinta de Spiderman
+function drawTorch(){
+  if ((!twoPlayerMode && soloCharacter !== 'torch') || !torch || !torch.alive) return;
+  const sx = torch.x - cameraX, sy = torch.y;
+  if (sx < -60 || sx > W + 60) return;
+  const dir = torch.facing;
+  const now = Date.now();
+
+  ctx.save();
+  ctx.translate(sx, sy);
+  // se "acuesta" hacia el lado cuando vuela horizontal, y queda parada (para
+  // arriba o boca abajo si cae) cuando predomina el movimiento vertical
+  ctx.rotate(torch.angle || 0);
+  ctx.lineCap = 'round';
+
+  // aura de fuego
+  const glow = ctx.createRadialGradient(0,0,2,0,0,26);
+  glow.addColorStop(0, 'rgba(255,180,60,.55)');
+  glow.addColorStop(1, 'rgba(255,90,20,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(0,2,26,0,Math.PI*2); ctx.fill();
+
+  // piernas
+  ctx.strokeStyle = '#ff7a1a';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(0, 3); ctx.lineTo(-6*dir, 20);
+  ctx.moveTo(0, 3); ctx.lineTo(8*dir, 18);
+  ctx.stroke();
+
+  // torso
+  ctx.fillStyle = '#ff9a2e';
+  ctx.beginPath();
+  ctx.ellipse(0, -4, 9, 12, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#ffd166';
+  ctx.beginPath();
+  ctx.ellipse(0, -4, 4.5, 8, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // brazos
+  ctx.strokeStyle = '#ff9a2e';
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -8); ctx.lineTo(10*dir, -14);
+  ctx.moveTo(0, -8); ctx.lineTo(-9*dir, -13);
+  ctx.stroke();
+
+  // cabeza envuelta en llamas
+  ctx.fillStyle = '#ffb347';
+  ctx.beginPath(); ctx.arc(0, -18, 7.5, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#ff5e1a';
+  for (let i = 0; i < 5; i++){
+    const ang = (i/5)*Math.PI*2 + now/220;
+    const r1 = 7.5, r2 = 12 + Math.sin(now/150 + i)*2.5;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(ang)*r1, -18+Math.sin(ang)*r1);
+    ctx.lineTo(Math.cos(ang+0.25)*r2, -18+Math.sin(ang+0.25)*r2*0.8);
+    ctx.lineTo(Math.cos(ang-0.25)*(r1+2), -18+Math.sin(ang-0.25)*(r1+2));
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = '#3a1200';
+  ctx.beginPath(); ctx.ellipse(2.5*dir, -19, 1.6, 1.1, 0, 0, Math.PI*2); ctx.fill();
+
+  // llamarada del propulsor: un estallido breve cada vez que se dispara un
+  // impulso (ya no depende de mantener Espacio apretada, ahora es a impulsos)
+  if (torch.flameFX > 0){
+    const strength = torch.flameFX / 12;
+    ctx.fillStyle = `rgba(255,140,20,${0.55 + 0.35*strength})`;
+    const flick = (6 + Math.sin(now/40)*3) * (0.6 + strength);
+    ctx.beginPath();
+    ctx.moveTo(-5, 20); ctx.lineTo(5, 20); ctx.lineTo(0, 20+flick+10);
+    ctx.closePath(); ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 function drawPowerUps(){
   const t = Date.now() / 300;
   for (const p of powerUps){
@@ -2226,6 +2867,60 @@ function drawPowerUps(){
     }
     ctx.restore();
   }
+}
+
+// llamita exclusiva del modo 2P: recarga la energía de la Antorcha
+function drawFlamePowerUps(){
+  const t = Date.now() / 300;
+  for (const p of flamePowerUps){
+    const sx = p.x - cameraX;
+    if (sx < -30 || sx > W + 30) continue;
+    const bob = Math.sin(t + p.x) * 6;
+    const sy = p.y + bob;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    const glow = ctx.createRadialGradient(0,0,2,0,0,22);
+    glow.addColorStop(0, 'rgba(255,140,40,.9)');
+    glow.addColorStop(1, 'rgba(255,140,40,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ff9a2e';
+    ctx.beginPath(); ctx.arc(0,0,13,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff3d6';
+    ctx.beginPath();
+    ctx.moveTo(0,7);
+    ctx.quadraticCurveTo(-6,0,0,-8);
+    ctx.quadraticCurveTo(6,0,0,7);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// power-up de revivir (modo 2P): temática de fuego si murió la Antorcha, o de
+// telaraña si murió Spiderman
+function drawRevivePickup(){
+  if (!revivePickup) return;
+  const sx = revivePickup.x - cameraX, sy0 = revivePickup.y;
+  if (sx < -30 || sx > W + 30) return;
+  const t = Date.now()/300;
+  const bob = Math.sin(t) * 6;
+
+  ctx.save();
+  ctx.translate(sx, sy0 + bob);
+  const isTorchRevive = revivePickup.type === 'torch';
+  const glowColor = isTorchRevive ? 'rgba(255,140,40,.9)' : 'rgba(120,220,255,.9)';
+  const glow = ctx.createRadialGradient(0,0,2,0,0,26);
+  glow.addColorStop(0, glowColor);
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(0,0,26,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = isTorchRevive ? '#ff9a2e' : '#4dd0e1';
+  ctx.beginPath(); ctx.arc(0,0,15,0,Math.PI*2); ctx.fill();
+  ctx.font = 'bold 16px Segoe UI, Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(isTorchRevive ? '🔥' : '🕸️', 0, 1);
+  ctx.restore();
 }
 
 function drawPickupMsg(){
@@ -2657,6 +3352,29 @@ function drawWebShots(){
   }
 }
 
+// proyectiles de fuego de la Antorcha (jugador 2, solo 2P) — igual mecánica que
+// drawWebShots(), con paleta de llama
+function drawTorchShots(){
+  for (const w of torchShots){
+    const sx = w.x - cameraX, sy = w.y;
+    if (sx < -20 || sx > W + 20) continue;
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(Math.atan2(w.vy, w.vx));
+    const glow = ctx.createRadialGradient(0,0,1,0,0,9);
+    glow.addColorStop(0, 'rgba(255,160,40,.9)');
+    glow.addColorStop(1, 'rgba(255,160,40,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0,0,9,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#ff9a2e';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-6,0); ctx.lineTo(6,0); ctx.stroke();
+    ctx.fillStyle = '#ffd166';
+    ctx.beginPath(); ctx.arc(4,0,2.2,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+}
+
 function drawHelicopters(){
   const now = Date.now();
   for (const h of helicopters){
@@ -2716,15 +3434,19 @@ function draw(){
   drawSandHands();
   drawRhinos();
   drawPowerUps();
+  drawFlamePowerUps();
+  drawRevivePickup();
   drawEnemies();
   drawClimbers();
   drawScorpions();
   drawHelicopters();
   drawPoisonBolts();
   drawWebShots();
+  drawTorchShots();
   drawWeb();
   drawMissMarker();
   drawPlayer();
+  drawTorch();
   drawPickupMsg();
 }
 
