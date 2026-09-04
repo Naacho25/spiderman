@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Trepamuros - Swing entre edificios</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
 <style>
   html, body {
     margin: 0; padding: 0; overflow: hidden;
@@ -78,10 +81,12 @@
   #startOverlay {
     position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     flex-direction: column; text-align: center; z-index: 5;
+    /* fondo semitransparente (scrim) en vez de opaco: deja ver el "attract mode"
+       animado del canvas por detrás, como el menú de un juego real */
     background:
-      radial-gradient(ellipse at 50% -10%, rgba(77,208,225,.16), transparent 55%),
-      radial-gradient(ellipse at 85% 110%, rgba(255,90,20,.14), transparent 50%),
-      rgba(6,4,14,.92);
+      radial-gradient(ellipse at 50% -10%, rgba(77,208,225,.20), transparent 55%),
+      radial-gradient(ellipse at 85% 110%, rgba(255,90,20,.18), transparent 50%),
+      linear-gradient(180deg, rgba(4,2,10,.78), rgba(6,4,14,.88) 55%, rgba(4,2,10,.92));
     color: #fff; padding: 20px; box-sizing: border-box; overflow-y: auto;
   }
   .menu-screen {
@@ -89,15 +94,31 @@
     width: 100%; max-width: 460px; animation: menuFadeIn .22s ease;
   }
   @keyframes menuFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-  #startOverlay h1 { font-size: 36px; margin: 0 0 6px; letter-spacing: .5px; }
-  #startOverlay h2 { font-size: 24px; margin: 0 0 6px; }
-  #startOverlay p { color: #bbb; max-width: 380px; line-height: 1.5; font-size: 15px; margin: 0 0 6px; }
-  .menu-subtitle { color: #999; font-size: 13.5px; margin: 0 0 22px; }
+  #startOverlay h1, #startOverlay h2, .menu-primary-btn {
+    font-family: 'Bangers', 'Segoe UI', Arial, sans-serif;
+  }
+  #startOverlay h1 {
+    font-size: 52px; margin: 0 0 6px; letter-spacing: 1.5px; color: #ff4d4d;
+    -webkit-text-stroke: 1.5px #1b1030;
+    text-shadow: 0 0 6px #1b1030, 0 0 18px rgba(77,208,225,.55), 0 4px 0 #1b1030;
+    animation: titlePulse 2.6s ease-in-out infinite;
+  }
+  @keyframes titlePulse {
+    0%, 100% { text-shadow: 0 0 6px #1b1030, 0 0 18px rgba(77,208,225,.55), 0 4px 0 #1b1030; }
+    50% { text-shadow: 0 0 10px #1b1030, 0 0 34px rgba(77,208,225,.9), 0 4px 0 #1b1030; }
+  }
+  #startOverlay h2 { font-size: 30px; margin: 0 0 6px; letter-spacing: .5px; color: #ffd166; }
+  #startOverlay p { color: #ccc; max-width: 380px; line-height: 1.5; font-size: 15px; margin: 0 0 6px; }
+  .menu-subtitle { color: #aaa; font-size: 13.5px; margin: 0 0 22px; }
+  .home-records {
+    font-size: 14px; font-weight: 700; color: #ffd166; margin: 4px 0 4px;
+    text-shadow: 0 2px 6px rgba(0,0,0,.6);
+  }
 
   .menu-primary-btn {
     background: linear-gradient(135deg, #4dd0e1, #38b6c9); color: #08202a; border: none;
-    padding: 14px 40px; font-size: 17px; font-weight: 800; border-radius: 30px; cursor: pointer;
-    margin-top: 20px; box-shadow: 0 6px 18px rgba(77,208,225,.3); transition: transform .12s;
+    padding: 14px 40px; font-size: 19px; letter-spacing: .5px; font-weight: 400; border-radius: 30px; cursor: pointer;
+    margin-top: 20px; box-shadow: 0 6px 18px rgba(77,208,225,.4); transition: transform .12s;
   }
   .menu-primary-btn:hover { transform: scale(1.03); }
   .menu-primary-btn:active { transform: scale(.97); }
@@ -286,6 +307,7 @@
   <div id="homeMenu" class="menu-screen">
     <h1>🕸️ Trepamuros</h1>
     <p>Colgate de edificio en edificio por las calles de Nueva York.</p>
+    <div id="homeRecords" class="home-records"></div>
     <button id="goPlayBtn" class="menu-primary-btn">▶️ Jugar</button>
     <button id="achievementsBtn" class="menu-secondary-btn">🏆 Logros</button>
     <button id="instructionsBtn" class="menu-secondary-btn">📖 ¿Cómo se juega?</button>
@@ -339,7 +361,7 @@
       </div>
       <div class="duo-row">
         <span class="duo-icon">🔥</span>
-        <div><b>Jugador 2: Antorcha Humana</b>Flechas para orientarse, Espacio para impulsarse hacia arriba.</div>
+        <div><b>Jugador 2: Antorcha Humana</b>Espacio da un impulso hacia arriba por cada toque (no hay que mantenerlo). Las flechas izquierda/derecha solo inclinan un poco ese impulso hacia ese lado.</div>
       </div>
     </div>
     <button id="duoStartBtn" class="menu-primary-btn">Comenzar</button>
@@ -351,6 +373,7 @@
 <div id="achievementsOverlay">
   <h2>🏆 Logros</h2>
   <div class="ach-sub">Se guardan solos entre partidas</div>
+  <div id="achRecordsSub" class="ach-sub"></div>
   <div id="achievementsList"></div>
   <button id="closeAchievements">Volver</button>
 </div>
@@ -392,7 +415,7 @@
     </div>
     <div class="instr-row">
       <span class="instr-icon">🚀</span>
-      <div><div class="instr-name">Power-up: Súper salto</div><div class="instr-desc">Te da un impulso hacia arriba y adelante para cubrir varios metros de una.</div></div>
+      <div><div class="instr-name">Power-up: Súper salto</div><div class="instr-desc">Te da un impulso hacia arriba y adelante para cubrir varios metros de una. En modo 2 jugadores lo puede agarrar cualquiera de los dos, pero se activa para Spiderman y la Antorcha al mismo tiempo — no hace falta que lo agarren los dos por separado.</div></div>
     </div>
     <div class="instr-row">
       <span class="instr-icon">🕸️</span>
@@ -432,11 +455,19 @@
     </div>
     <div class="instr-row">
       <span class="instr-icon">👕</span>
-      <div><div class="instr-name">Trajes</div><div class="instr-desc">Elegí tu skin en el menú principal antes de jugar. Hay 5 para probar.</div></div>
+      <div><div class="instr-name">Trajes</div><div class="instr-desc">Elegí tu skin en el menú principal antes de jugar, en la tarjeta de Spiderman de la pantalla de selección de personaje. Hay 5 para probar. Son exclusivos de Spiderman: la Antorcha Humana no tiene skins, siempre se ve igual.</div></div>
     </div>
     <div class="instr-row">
       <span class="instr-icon">🎮</span>
-      <div><div class="instr-name">Elegí tu personaje</div><div class="instr-desc">En el menú principal podés elegir jugar solo con 🕷️ <strong>Spiderman</strong> (telaraña, como siempre) o solo con la 🔥 <strong>Antorcha Humana</strong>. Jugando de Antorcha avanzás sola automáticamente, cada vez más rápido — vos solo controlás la altura: <strong>Espacio</strong> (o tocar/clickear en cualquier parte de la pantalla) da un impulso hacia arriba y gasta energía; la llamita 🔥 te la recarga. Si se te acaba la energía no podés impulsarte más, así que dosificá los toques. Este selector no aplica si activás el modo 2 jugadores (ahí siempre es Spiderman + Antorcha).</div></div>
+      <div><div class="instr-name">Elegí tu personaje</div><div class="instr-desc">Al elegir "1 Jugador" en el menú podés jugar solo con 🕷️ <strong>Spiderman</strong> (telaraña, como siempre) o solo con la 🔥 <strong>Antorcha Humana</strong>. Jugando de Antorcha avanzás sola automáticamente, cada vez más rápido — vos solo controlás la altura con impulsos: cada toque de <strong>Espacio</strong> (o tocar/clickear en cualquier parte de la pantalla) es un empujón vertical de una sola vez, no hay que mantenerlo apretado. Cada impulso gasta energía; la llamita 🔥 te la recarga. Si se te acaba la energía no podés impulsarte más, así que dosificá los toques. Este selector no aplica en modo 2 jugadores (ahí siempre es Spiderman + Antorcha).</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">💫</span>
+      <div><div class="instr-name">Estela de fuego de la Antorcha</div><div class="instr-desc">Mientras vuela, la Antorcha deja atrás una estela de llamas y humo que se va desvaneciendo — puramente visual, no afecta la jugabilidad, pero ayuda a ver hacia dónde venías.</div></div>
+    </div>
+    <div class="instr-row">
+      <span class="instr-icon">🌌</span>
+      <div><div class="instr-name">Villanos con estilo Antorcha</div><div class="instr-desc">Jugando de Antorcha Humana (sola o en 2P) te vas a cruzar con versiones homenaje a los Cuatro Fantásticos de los mismos 5 enemigos: el villano volador aparece como un surfer plateado, el trepador como Doctor Doom, el corredor callejero como el Hombre Topo, el francotirador de techo como Blastaar, y en vez de una mano de arena que sube desde el piso baja un brazo cósmico de Galactus desde ARRIBA de la pantalla (ojo, ataca al revés que la mano de arena). En modo 2 jugadores aparece una mezcla de ambos elencos de villanos en la misma partida.</div></div>
     </div>
     <div class="instr-row">
       <span class="instr-icon">🏆</span>
@@ -448,7 +479,7 @@
     </div>
     <div class="instr-row">
       <span class="instr-icon">🔥</span>
-      <div><div class="instr-name">Modo 2 jugadores (solo PC)</div><div class="instr-desc">Activá el casillero en el menú principal para sumar a la Antorcha Humana como jugador 2. Spiderman pasa a moverse con <strong>WASD</strong>. La Antorcha se controla con <strong>flechas izquierda/derecha</strong> para moverse y <strong>Espacio</strong> para volar hacia arriba (gasta energía; al soltar, cae). La llamita 🔥 le recarga la energía. Si uno de los dos muere, el otro sigue solo y aparece un power-up para revivirlo (🔥 si murió la Antorcha, 🕸️ si murió Spiderman). La partida termina recién cuando mueren los dos.</div></div>
+      <div><div class="instr-name">Modo 2 jugadores (solo PC)</div><div class="instr-desc">Elegí la tarjeta "2 Jugadores" en el menú para jugar Spiderman + Antorcha Humana en el mismo teclado. Spiderman se mueve con <strong>WASD</strong> y sigue apuntando/tirando la telaraña con el mouse. La Antorcha se impulsa con <strong>Espacio</strong>: cada apretada da un empujón hacia arriba de una sola vez (no continuo), gasta energía, y si en ese momento tenés apretada una <strong>flecha izquierda/derecha</strong> el impulso sale con una leve inclinación hacia ese lado — las flechas solas ya no la mueven. La llamita 🔥 le recarga la energía. Si uno de los dos muere, el otro sigue solo y aparece un power-up para revivirlo (🔥 si murió la Antorcha, 🕸️ si murió Spiderman): tiene un "imán" que lo va acercando solo si pasás cerca, con un radio bien generoso para agarrarlo sin puntería fina. La partida termina recién cuando mueren los dos.</div></div>
     </div>
   </div>
   <button id="closeInstructions">Volver</button>
@@ -512,7 +543,7 @@ const TORCH_IMPULSE_COST = 8;      // energía que gasta cada impulso (apretada 
 const TORCH_IMPULSE_KICK = 10.5;   // fuerza del impulso vertical por apretada (subida real de un solo toque)
 const TORCH_IMPULSE_SIDE_KICK = 3; // "leve orientación" horizontal si tenés una flecha apretada al impulsar
 const TORCH_MOVE_SPEED = 4.2;    // (sin uso en el impulso; queda por compatibilidad)
-let torch, flamePowerUps, revivePickup, torchShots, keys2;
+let torch, flamePowerUps, revivePickup, torchShots, keys2, torchTrail;
 let torchImpulsePending = false; // se activa con cada apretada de Espacio (borde, no mantenida)
 let torchCruiseSpeed = 0;        // velocidad horizontal "de crucero", se adapta sola a la de Spiderman
 let lastPlayerVX = 0;            // velocidad horizontal real de Spiderman en el frame actual
@@ -615,7 +646,9 @@ let stats = {
   bestDistance: 0, bestHeight: 0, totalPowerUps: 0,
   totalEnemiesAvoided: 0, extraLifeUses: 0, skinsUsed: [],
   enemiesDefeated: 0, totalDayCycles: 0, enemyTypesSeen: [],
-  landmarkCounts: { empire: 0, wtc: 0, times: 0 }, unlockedIds: []
+  landmarkCounts: { empire: 0, wtc: 0, times: 0 }, unlockedIds: [],
+  bestDistanceSpiderman: 0, bestDistanceTorch: 0,
+  torchEnemyTypesSeen: [], reviveCount: 0
 };
 
 function loadStats(){
@@ -624,12 +657,35 @@ function loadStats(){
     if (raw) stats = Object.assign(stats, JSON.parse(raw));
   } catch (e) { /* almacenamiento local no disponible en este entorno */ }
   if (!stats.unlockedIds) stats.unlockedIds = [];
+  if (!stats.torchEnemyTypesSeen) stats.torchEnemyTypesSeen = [];
+  if (!stats.reviveCount) stats.reviveCount = 0;
+  // migración: los saves viejos tenían un único stats.bestDistance (de antes de
+  // que existiera el modo Antorcha) — se convierte una sola vez en el récord de
+  // Spiderman, ya que históricamente era el único personaje jugable
+  if (typeof stats.bestDistance === 'number' && !stats.bestDistanceSpiderman){
+    stats.bestDistanceSpiderman = stats.bestDistance;
+  }
+  if (!stats.bestDistanceSpiderman) stats.bestDistanceSpiderman = 0;
+  if (!stats.bestDistanceTorch) stats.bestDistanceTorch = 0;
+  delete stats.bestDistance;
   // sincroniza en silencio: no avisar por logros que ya estaban cumplidos antes de esta versión
   for (const a of ACHIEVEMENTS){
     if (!stats.unlockedIds.includes(a.id) && a.check(stats)) stats.unlockedIds.push(a.id);
   }
   renderAchievements();
+  renderHomeRecords();
 }
+// readout de récords en el menú principal: uno por personaje, como en el
+// menú principal de cualquier juego con puntajes guardados
+function renderHomeRecords(){
+  const el = document.getElementById('homeRecords');
+  if (!el) return;
+  const sp = stats.bestDistanceSpiderman || 0;
+  const to = stats.bestDistanceTorch || 0;
+  if (sp <= 0 && to <= 0){ el.innerHTML = ''; return; }
+  el.innerHTML = '🏆 Spiderman: ' + sp + ' m &nbsp; 🔥 Antorcha: ' + to + ' m';
+}
+
 function saveStats(){
   checkNewAchievements();
   try { localStorage.setItem('trepamuros_stats', JSON.stringify(stats)); }
@@ -667,9 +723,9 @@ function processAchievementToastQueue(){
 }
 
 const ACHIEVEMENTS = [
-  { id:'dist_800', category:'distancia', name:'Corredor urbano', desc:'Recorré 800 m en una partida', check: s => s.bestDistance >= 800 },
-  { id:'dist_2500', category:'distancia', name:'Maratón de azotea', desc:'Recorré 2500 m en una partida', check: s => s.bestDistance >= 2500 },
-  { id:'dist_6000', category:'distancia', name:'Leyenda de la ciudad', desc:'Recorré 6000 m en una partida', check: s => s.bestDistance >= 6000 },
+  { id:'dist_800', category:'distancia', name:'Corredor urbano', desc:'Recorré 800 m en una partida', check: s => Math.max(s.bestDistanceSpiderman||0, s.bestDistanceTorch||0) >= 800 },
+  { id:'dist_2500', category:'distancia', name:'Maratón de azotea', desc:'Recorré 2500 m en una partida', check: s => Math.max(s.bestDistanceSpiderman||0, s.bestDistanceTorch||0) >= 2500 },
+  { id:'dist_6000', category:'distancia', name:'Leyenda de la ciudad', desc:'Recorré 6000 m en una partida', check: s => Math.max(s.bestDistanceSpiderman||0, s.bestDistanceTorch||0) >= 6000 },
 
   { id:'height_50', category:'altura', name:'Primeros pasos en el aire', desc:'Llegá a 50 m de altura', check: s => s.bestHeight >= 50 },
   { id:'height_110', category:'altura', name:'Vértigo', desc:'Llegá a 110 m de altura', check: s => s.bestHeight >= 110 },
@@ -708,11 +764,17 @@ const ACHIEVEMENTS = [
 
   { id:'skins_all', category:'extra', name:'Guardarropa completo', desc:'Probá los 5 trajes disponibles', check: s => (s.skinsUsed||[]).length >= SKINS.length },
   { id:'extralife', category:'extra', name:'Segunda oportunidad', desc:'Usá un rebote de vida extra', check: s => s.extraLifeUses >= 1 },
+  { id:'torch_variety_all', category:'enemigos', name:'Cuatro Fantásticos', desc:'Cruzate con los 5 villanos con estilo Antorcha (Cuatro Fantásticos)', check: s => (s.torchEnemyTypesSeen||[]).length >= 5 },
+  { id:'revive_1', category:'extra', name:'Trabajo en equipo', desc:'Reviví a tu compañero en modo 2 jugadores', check: s => (s.reviveCount||0) >= 1 },
 ];
 
 function renderAchievements(){
   const list = document.getElementById('achievementsList');
   if (!list) return;
+  const recSub = document.getElementById('achRecordsSub');
+  if (recSub){
+    recSub.textContent = '🏆 Spiderman: ' + (stats.bestDistanceSpiderman||0) + ' m · 🔥 Antorcha: ' + (stats.bestDistanceTorch||0) + ' m';
+  }
   const categories = {
     distancia: '📏 Distancia', altura: '🪂 Altura', powerups: '✨ Power-ups',
     enemigos: '🕵️ Enemigos esquivados', derrotas: '⚔️ Enemigos derrotados',
@@ -874,11 +936,19 @@ function initGame(){
   torchImpulsePending = false;
   torchCruiseSpeed = 0;
   lastPlayerVX = 0;
+  torchTrail = []; // estela de fuego/humo que va dejando al volar
 
   // modo solo Antorcha: Spiderman queda completamente inerte (no se dibuja,
   // no se actualiza, no colisiona con nada) — la Antorcha pasa a ser EL personaje
   const soloTorchMode = !twoPlayerMode && soloCharacter === 'torch';
   if (soloTorchMode) player.alive = false;
+
+  // el HUD de "mejor" arranca mostrando el récord persistido del personaje que
+  // gobierna esta partida (antes quedaba siempre en 0 al recargar la página,
+  // porque nunca se leía de stats — un bug, no una decisión de diseño)
+  best = stats[recordFieldForRun()] || 0;
+  const bestEl0 = document.getElementById('best');
+  if (bestEl0) bestEl0.textContent = best;
 
   updateLifeHud();
   updateAutoShootHud();
@@ -989,13 +1059,26 @@ function updateStreetLife(){
 
 const POWERUP_TYPES = ['jump', 'shoot', 'life'];
 
-// registra que te cruzaste con este tipo de enemigo (para el logro de variedad)
-function registerEnemyType(type){
+// registra que te cruzaste con este tipo de enemigo (para el logro de variedad).
+// si además se sabe el estilo visual con el que apareció ('torch' = reskin
+// homenaje a los Cuatro Fantásticos), también lo anota aparte para el logro de
+// variedad específico de esos 5 villanos — sin tocar el logro original, que
+// sigue contando los 5 tipos base sin importar el estilo.
+function registerEnemyType(type, style){
+  let changed = false;
   if (!stats.enemyTypesSeen) stats.enemyTypesSeen = [];
   if (!stats.enemyTypesSeen.includes(type)){
     stats.enemyTypesSeen.push(type);
-    saveStats();
+    changed = true;
   }
+  if (style === 'torch'){
+    if (!stats.torchEnemyTypesSeen) stats.torchEnemyTypesSeen = [];
+    if (!stats.torchEnemyTypesSeen.includes(type)){
+      stats.torchEnemyTypesSeen.push(type);
+      changed = true;
+    }
+  }
+  if (changed) saveStats();
 }
 
 function ensurePowerUps(){
@@ -1063,6 +1146,8 @@ function tryReviveCollision(){
     touched = pointToSegmentDist(revivePickup.x, revivePickup.y, player.x, player.y, web.anchor.x, web.anchor.y) < 30;
   }
   if (touched){
+    stats.reviveCount = (stats.reviveCount||0) + 1;
+    saveStats();
     if (revivePickup.type === 'player'){
       player.alive = true;
       player.x = survivor.x - 40; player.y = survivor.y - 10;
@@ -1246,8 +1331,9 @@ function ensureEnemies(){
     while (lastX < cameraX + W + 900){
       lastX += spacingBase + Math.random()*spacingRand;
       const y = groundY - (180 + Math.random()*H*0.4);
-      enemies.push({ x:lastX, y, baseY:y, phase: Math.random()*10, hit:false, counted:false, style: pickEnemyStyle() });
-      registerEnemyType('goblin');
+      const style = pickEnemyStyle();
+      enemies.push({ x:lastX, y, baseY:y, phase: Math.random()*10, hit:false, counted:false, style });
+      registerEnemyType('goblin', style);
     }
   }
   // contar como "esquivado" el que quedó atrás sin chocar, antes de sacarlo de la lista
@@ -1282,11 +1368,12 @@ function ensureClimbers(){
       const baseY = top + 30 + Math.random() * usableH;
       const climbRange = Math.min(usableH * 0.4, Math.min(120, 50 + p*0.05));
       const speed = Math.min(1.4, 0.55 + p*0.0004);
+      const style = pickEnemyStyle();
       climbers.push({
         x: b.x + b.width*0.5, baseY, climbRange, speed, phase: Math.random()*10,
-        wallTop: top + 12, wallBottom: groundY - 12, hit:false, counted:false, style: pickEnemyStyle()
+        wallTop: top + 12, wallBottom: groundY - 12, hit:false, counted:false, style
       });
-      registerEnemyType('climber');
+      registerEnemyType('climber', style);
       lastX = b.x;
     }
   }
@@ -1312,8 +1399,9 @@ function ensureSandHands(){
     while (lastX < cameraX + W + 1200){
       lastX += spacingBase + Math.random()*spacingRand;
       // ciclo propio e independiente: fase inicial al azar para que no estén sincronizadas
-      sandHands.push({ x:lastX, phase: Math.floor(Math.random()*SAND_CYCLE_LEN), heightFactor:0, topY:groundY, hit:false, counted:false, style: pickEnemyStyle() });
-      registerEnemyType('sandhand');
+      const style = pickEnemyStyle();
+      sandHands.push({ x:lastX, phase: Math.floor(Math.random()*SAND_CYCLE_LEN), heightFactor:0, topY:groundY, hit:false, counted:false, style });
+      registerEnemyType('sandhand', style);
     }
   }
   for (const s of sandHands){
@@ -1338,8 +1426,9 @@ function ensureRhinos(){
     while (lastX < cameraX + W + 1000){
       lastX += spacingBase + Math.random()*spacingRand;
       const speed = Math.min(5.5, 2.3 + p*0.001);
-      rhinos.push({ x:lastX, spawnX:lastX, speed, hit:false, counted:false, style: pickEnemyStyle() });
-      registerEnemyType('rhino');
+      const style = pickEnemyStyle();
+      rhinos.push({ x:lastX, spawnX:lastX, speed, hit:false, counted:false, style });
+      registerEnemyType('rhino', style);
     }
   }
   for (const r of rhinos){
@@ -1369,8 +1458,9 @@ function ensureScorpions(){
       if (Math.random() > 0.55) continue;
       const top = groundY - b.height;
       const baseCooldown = Math.max(65, 210 - p*0.07);
-      scorpions.push({ x: b.x + b.width*0.5, y: top - 4, baseCooldown, cooldown: baseCooldown*0.6, hit:false, counted:false, style: pickEnemyStyle() });
-      registerEnemyType('scorpion');
+      const style = pickEnemyStyle();
+      scorpions.push({ x: b.x + b.width*0.5, y: top - 4, baseCooldown, cooldown: baseCooldown*0.6, hit:false, counted:false, style });
+      registerEnemyType('scorpion', style);
       lastX = b.x;
     }
   }
@@ -1596,6 +1686,7 @@ document.getElementById('menuFromDeathBtn').addEventListener('click', () => {
   showMenu();
 });
 function beginGame(){
+  stopMenuBackground();
   document.getElementById('startOverlay').style.display = 'none';
   document.getElementById('hud').style.display = 'flex';
   document.getElementById('pauseBtn').style.display = 'flex';
@@ -1639,6 +1730,8 @@ function showMenu(){
   document.getElementById('startOverlay').style.display = 'flex';
   showMenuScreen('homeMenu');
   renderSkinPicker();
+  renderHomeRecords();
+  startMenuBackground();
 }
 
 function restart(){
@@ -1801,6 +1894,33 @@ function update(){
     torch.velSmoothX += (drift - torch.velSmoothX) * 0.15;
     torch.velSmoothY += ((tvy + tay) - torch.velSmoothY) * 0.15;
     torch.angle = Math.atan2(torch.velSmoothX, -torch.velSmoothY);
+
+    // estela de fuego/humo: un punto de llama casi todos los frames (más grande
+    // justo después de un impulso), y de tanto en tanto uno de humo, un poco
+    // atrás del cuerpo (en dirección contraria a hacia donde apunta el ángulo)
+    const trailBackX = Math.sin(torch.angle) * -10;
+    const trailBackY = Math.cos(torch.angle) * 10;
+    torchTrail.push({
+      x: torch.x + trailBackX + (Math.random()-0.5)*4,
+      y: torch.y + trailBackY + (Math.random()-0.5)*4,
+      age: 0, smoke: false,
+      size: 7 + (torch.flameFX > 0 ? torch.flameFX * 0.5 : 0) + Math.random()*3
+    });
+    if (elapsedFrames % 3 === 0){
+      torchTrail.push({
+        x: torch.x + trailBackX*1.4 + (Math.random()-0.5)*8,
+        y: torch.y + trailBackY*1.4 + (Math.random()-0.5)*8,
+        age: 0, smoke: true, size: 6 + Math.random()*5
+      });
+    }
+  }
+  // envejecer y podar la estela (corre siempre, incluso si la Antorcha no está
+  // activa este frame, para que lo que ya se emitió se termine de desvanecer)
+  if (torchTrail && torchTrail.length){
+    for (const t of torchTrail) t.age++;
+    const maxAge = 34;
+    torchTrail = torchTrail.filter(t => t.age < maxAge);
+    if (torchTrail.length > 220) torchTrail.splice(0, torchTrail.length - 220); // tope duro de seguridad
   }
 
   // altura máxima alcanzada en esta partida (para el logro de altura)
@@ -2261,6 +2381,13 @@ function update(){
   if (score > best){ best = score; document.getElementById('best').textContent = best; }
 }
 
+// qué récord cuenta esta partida: el de Spiderman en 1P clásico Y en 2P (la
+// cámara/progreso de 2P siempre está anclada a Spiderman, ver activeX()); el
+// de la Antorcha solo cuando se juega en solo de Antorcha (1P)
+function recordFieldForRun(){
+  return (!twoPlayerMode && soloCharacter === 'torch') ? 'bestDistanceTorch' : 'bestDistanceSpiderman';
+}
+
 function triggerGameOver(){
   if (gameOver) return;
   gameOver = true;
@@ -2270,15 +2397,19 @@ function triggerGameOver(){
   document.getElementById('overlay').classList.add('show');
 
   const heightMeters = Math.floor(sessionMaxHeightPx / 10);
-  const isNewRecord = score > stats.bestDistance;
-  stats.bestDistance = Math.max(stats.bestDistance, score);
+  const field = recordFieldForRun();
+  const prevBest = stats[field] || 0;
+  const isNewRecord = score > prevBest;
+  stats[field] = Math.max(prevBest, score);
   stats.bestHeight = Math.max(stats.bestHeight, heightMeters);
   saveStats();
+  renderHomeRecords();
 
+  const who = field === 'bestDistanceTorch' ? 'Antorcha' : 'Spiderman';
   const recordEl = document.getElementById('recordLine');
   recordEl.textContent = isNewRecord
-    ? '🏆 ¡Nuevo récord en este dispositivo!'
-    : 'Tu récord en este dispositivo: ' + stats.bestDistance + ' m';
+    ? '🏆 ¡Nuevo récord de ' + who + ' en este dispositivo!'
+    : 'Tu récord de ' + who + ' en este dispositivo: ' + stats[field] + ' m';
 }
 
 // ---------- render ----------
@@ -2372,6 +2503,60 @@ function drawSky(){
     const bh = 90 + (normIdx*97) % 140;
     ctx.fillRect(bx, groundY-bh, 170, bh);
   }
+}
+
+// ---------- fondo animado del menú ("attract mode") ----------
+// puramente decorativo: cielo con leve deriva de color + dos capas de siluetas
+// de edificios panneando solas a velocidad constante, con el mismo lenguaje
+// visual que drawSky()/drawBuildings() pero mucho más liviano (sin decoración,
+// sin day/night real, sin generación de mundo). Nunca toca update()/progressM/
+// enemies/etc — solo lee W/H y dibuja. Solo corre mientras #startOverlay está
+// visible: se arranca en el load inicial y en showMenu(), y se frena en beginGame().
+let menuBgFrame = 0;
+let menuBgLoopActive = false;
+function drawMenuBackground(){
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  const drift = (Math.sin(menuBgFrame / 900) + 1) / 2; // deriva lenta 0..1, ciclo de ~1.5min a 60fps
+  grad.addColorStop(0, lerpHex('#141033', '#241348', drift));
+  grad.addColorStop(0.55, lerpHex('#2c1a4a', '#3a2160', drift));
+  grad.addColorStop(1, '#0c0818');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // estrellas fijas, sutiles — mismo truco de posiciones pseudoaleatorias que drawSky()
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  for (let i = 0; i < 30; i++){
+    const sxp = (i*137) % W, syp = (i*59) % (H*0.5);
+    ctx.beginPath(); ctx.arc(sxp, syp, 1, 0, Math.PI*2); ctx.fill();
+  }
+
+  drawMenuBuildingLayer(menuBgFrame * 0.18, 0.32, 'rgba(15,9,28,.55)', 240);
+  drawMenuBuildingLayer(menuBgFrame * 0.40, 0.48, 'rgba(8,5,16,.8)', 190);
+  menuBgFrame++;
+}
+function drawMenuBuildingLayer(panX, heightFactor, color, tileW){
+  ctx.fillStyle = color;
+  const offset = panX % tileW;
+  for (let ti = -1; ti <= Math.ceil(W / tileW) + 1; ti++){
+    const worldTile = ti + Math.floor(panX / tileW);
+    const bx = ti*tileW - offset;
+    const normIdx = ((worldTile % 41) + 41) % 41;
+    const bh = H * heightFactor * (0.45 + (normIdx*53 % 100)/100 * 0.55);
+    ctx.fillRect(bx, H - bh, tileW*0.7, bh);
+  }
+}
+function menuBgLoop(){
+  if (!menuBgLoopActive) return;
+  drawMenuBackground();
+  requestAnimationFrame(menuBgLoop);
+}
+function startMenuBackground(){
+  if (menuBgLoopActive) return;
+  menuBgLoopActive = true;
+  requestAnimationFrame(menuBgLoop);
+}
+function stopMenuBackground(){
+  menuBgLoopActive = false;
 }
 
 function drawGround(){
@@ -2710,6 +2895,21 @@ function drawTimesLandmark(sx, top, b, windowColor, t){
   ctx.globalAlpha = 1;
 }
 
+// sombreado direccional sutil por edificio: una capa de gradiente por encima de la
+// fachada ya dibujada, más oscura de un lado y levemente más clara del otro, para
+// insinuar una dirección de luz consistente en todo el horizonte sin repintar la
+// paleta de cada edificio. De noche el lado en sombra se acentúa un poco más.
+function applyBuildingShading(sx, top, b, sky){
+  const grad = ctx.createLinearGradient(sx, 0, sx + b.width, 0);
+  const darkAlpha = sky.isNight ? 0.30 : 0.16;
+  const lightAlpha = sky.isNight ? 0.04 : 0.09;
+  grad.addColorStop(0, `rgba(0,0,0,${darkAlpha})`);
+  grad.addColorStop(0.6, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, `rgba(255,255,255,${lightAlpha})`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(sx, top, b.width, b.height);
+}
+
 function drawBuildings(){
   const sky = getSkyState();
   // de noche las ventanas brillan más cálidas; de día quedan más apagadas
@@ -2723,7 +2923,36 @@ function drawBuildings(){
     else if (b.landmark === 'wtc') drawWtcLandmark(sx, top, b, windowColor);
     else if (b.landmark === 'times') drawTimesLandmark(sx, top, b, windowColor, t);
     else { drawGenericBuilding(sx, top, b, windowColor); drawBuildingDecor(sx, top, b); }
+    applyBuildingShading(sx, top, b, sky);
   }
+}
+
+// altura de la superficie (techo de edificio o piso de la calle) en una posición X
+// del mundo dada — se usa para las sombras de contacto de personajes y enemigos
+function surfaceYAt(worldX){
+  for (let i = 0; i < buildings.length; i++){
+    const b = buildings[i];
+    if (worldX >= b.x && worldX <= b.x + b.width) return groundY - b.height;
+  }
+  return groundY;
+}
+
+// sombra de contacto suave: más grande/opaca cuanto más cerca está el personaje
+// de la superficie (techo o calle) que tiene debajo; se desvanece con la altura
+function drawContactShadow(sx, worldX, charY, sky){
+  const surfaceY = surfaceYAt(worldX);
+  const dist = surfaceY - charY;
+  if (dist < -25 || dist > 150) return;
+  const t = Math.max(0, 1 - Math.max(0, dist) / 150);
+  if (t <= 0.03) return;
+  const w = 9 + 16 * t, h = 3 + 4 * t;
+  const alpha = (sky && sky.isNight ? 0.5 : 0.35) * t;
+  ctx.save();
+  ctx.fillStyle = `rgba(0,0,0,${alpha.toFixed(3)})`;
+  ctx.beginPath();
+  ctx.ellipse(sx, surfaceY, w, h, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawWeb(){
@@ -2797,6 +3026,8 @@ function drawPlayer(){
   // más relajadas/flexionadas cuando va lento o recién soltó
   const legStretch = Math.min(1.7, 1 + speed*0.045);
 
+  drawContactShadow(px, player.x, player.y, getSkyState());
+
   ctx.save();
   ctx.translate(px, py);
   ctx.rotate(lean);
@@ -2866,6 +3097,40 @@ function drawPlayer(){
   ctx.restore();
 }
 
+// estela de fuego/humo que va dejando la Antorcha Humana al volar: puntitos de
+// llama (aditivo, brillan) y de humo (normal, se van apagando) que se
+// desvanecen y encogen con la edad. Independiente de si sigue viva/activa
+// este frame, así lo ya emitido termina de disiparse en pantalla.
+function drawTorchTrail(){
+  if (!torchTrail || !torchTrail.length) return;
+  const maxAge = 34;
+  ctx.save();
+  for (const t of torchTrail){
+    const life = 1 - t.age / maxAge; // 1 = recién emitido, 0 = a punto de desaparecer
+    if (life <= 0) continue;
+    const sx = t.x - cameraX, sy = t.y;
+    if (sx < -30 || sx > W + 30) continue;
+    const r = t.size * (0.55 + life * 0.7);
+    if (t.smoke){
+      ctx.globalCompositeOperation = 'source-over';
+      const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+      g.addColorStop(0, `rgba(90,80,75,${0.22*life})`);
+      g.addColorStop(1, 'rgba(90,80,75,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI*2); ctx.fill();
+    } else {
+      ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+      g.addColorStop(0, `rgba(255,210,120,${0.5*life})`);
+      g.addColorStop(0.5, `rgba(255,120,30,${0.32*life})`);
+      g.addColorStop(1, 'rgba(255,60,10,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 // Antorcha Humana (jugador 2 en 2P, o único personaje en modo solo Antorcha):
 // silueta humanoide en llamas, diseño original, distinta de Spiderman
 function drawTorch(){
@@ -2874,6 +3139,9 @@ function drawTorch(){
   if (sx < -60 || sx > W + 60) return;
   const dir = torch.facing;
   const now = Date.now();
+  const sky = getSkyState();
+
+  drawContactShadow(sx, torch.x, torch.y, sky);
 
   ctx.save();
   ctx.translate(sx, sy);
@@ -2882,12 +3150,36 @@ function drawTorch(){
   ctx.rotate(torch.angle || 0);
   ctx.lineCap = 'round';
 
-  // aura de fuego
-  const glow = ctx.createRadialGradient(0,0,2,0,0,26);
-  glow.addColorStop(0, 'rgba(255,180,60,.55)');
-  glow.addColorStop(1, 'rgba(255,90,20,0)');
-  ctx.fillStyle = glow;
-  ctx.beginPath(); ctx.arc(0,2,26,0,Math.PI*2); ctx.fill();
+  // aura de fuego: varias capas con mezcla ADITIVA ('lighter'), para que se vea
+  // como luz realmente emitida (los colores se queman/blanquean donde se
+  // superponen) en vez de una forma naranja translúcida plana. Un parpadeo
+  // sutil basado en senoides de 'now' hace que el brillo se sienta vivo.
+  const flick = Math.sin(now/90) * 0.5 + Math.sin(now/47 + 1.3) * 0.3; // ~-0.8..0.8
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  // halo exterior grande y muy suave (bloom)
+  const outerR = 40 + flick*3;
+  const outerGlow = ctx.createRadialGradient(0,2,4,0,2,outerR);
+  outerGlow.addColorStop(0, 'rgba(255,140,40,.20)');
+  outerGlow.addColorStop(1, 'rgba(255,90,20,0)');
+  ctx.fillStyle = outerGlow;
+  ctx.beginPath(); ctx.arc(0,2,Math.max(1,outerR),0,Math.PI*2); ctx.fill();
+  // halo medio, cálido y naranja
+  const midR = 24 + flick*2;
+  const midGlow = ctx.createRadialGradient(0,2,2,0,2,midR);
+  midGlow.addColorStop(0, 'rgba(255,170,60,.5)');
+  midGlow.addColorStop(1, 'rgba(255,90,20,0)');
+  ctx.fillStyle = midGlow;
+  ctx.beginPath(); ctx.arc(0,2,Math.max(1,midR),0,Math.PI*2); ctx.fill();
+  // núcleo caliente, casi blanco, pegado al cuerpo
+  const coreR = 10 + flick*1.5;
+  const coreGlow = ctx.createRadialGradient(0,-2,0,0,-2,coreR);
+  coreGlow.addColorStop(0, 'rgba(255,250,220,.85)');
+  coreGlow.addColorStop(0.5, 'rgba(255,210,120,.5)');
+  coreGlow.addColorStop(1, 'rgba(255,150,50,0)');
+  ctx.fillStyle = coreGlow;
+  ctx.beginPath(); ctx.arc(0,-2,Math.max(1,coreR),0,Math.PI*2); ctx.fill();
+  ctx.restore();
 
   // piernas
   ctx.strokeStyle = '#ff7a1a';
@@ -2943,6 +3235,32 @@ function drawTorch(){
     ctx.closePath(); ctx.fill();
   }
 
+  ctx.restore();
+}
+
+// charco de luz que la Antorcha proyecta sobre lo que ya está dibujado debajo
+// (edificios cercanos, calle, enemigos): un único gradiente radial grande, muy
+// suave y de baja opacidad, aplicado con mezcla aditiva ('lighter') para que
+// realmente ilumine la escena en vez de solo dibujarse encima como una mancha.
+function drawTorchLightPool(){
+  if ((!twoPlayerMode && soloCharacter !== 'torch') || !torch || !torch.alive) return;
+  const sx = torch.x - cameraX, sy = torch.y;
+  if (sx < -170 || sx > W + 170) return;
+  const now = Date.now();
+  const flick = Math.sin(now/110) * 0.5 + Math.sin(now/53 + 2) * 0.3;
+  const sky = getSkyState();
+  const R = Math.max(1, 170 + flick*10);
+  // de noche el contraste del brillo se nota más (más vívido), de día se atenúa
+  // para no lavar la lectura de la escena
+  const baseAlpha = sky.isNight ? 0.16 : 0.08;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, R);
+  grad.addColorStop(0, `rgba(255,175,80,${baseAlpha})`);
+  grad.addColorStop(0.5, `rgba(255,120,40,${(baseAlpha*0.4).toFixed(3)})`);
+  grad.addColorStop(1, 'rgba(255,90,20,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(sx, sy, R, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 }
 
@@ -3139,10 +3457,13 @@ function drawSilverSurferEnemy(en, dir, now){
 
 function drawEnemies(){
   const now = Date.now();
+  const sky = getSkyState();
   for (const en of enemies){
     const sx = en.drawX !== undefined ? en.drawX - cameraX : en.x - cameraX;
     if (sx < -60 || sx > W + 60) continue;
     const dir = en.dir || -1; // mirando hacia atrás, de donde viene el jugador
+    const worldX = en.drawX !== undefined ? en.drawX : en.x;
+    drawContactShadow(sx, worldX, en.y, sky);
     ctx.save();
     ctx.translate(sx, en.y);
 
@@ -3721,10 +4042,12 @@ function drawBlastaarScorpion(s, now, chargeUp){
 
 function drawScorpions(){
   const now = Date.now();
+  const sky = getSkyState();
   for (const s of scorpions){
     const sx = s.x - cameraX;
     if (sx < -60 || sx > W + 60) continue;
     const chargeUp = Math.max(0, 1 - s.cooldown / 30); // brilla más cerca de disparar
+    drawContactShadow(sx, s.x, s.y, sky);
     ctx.save();
     ctx.translate(sx, s.y);
 
@@ -3929,6 +4252,8 @@ function draw(){
   drawPoisonBolts();
   drawWebShots();
   drawTorchShots();
+  drawTorchTrail();
+  drawTorchLightPool();
   drawWeb();
   drawMissMarker();
   drawPlayer();
@@ -3943,6 +4268,9 @@ function loop(){
 }
 
 initGame();
+// el menú de inicio arranca visible por defecto (nadie oculta #startOverlay al
+// cargar), así que el fondo animado del menú también arranca acá
+startMenuBackground();
 </script>
 </body>
 </html>
