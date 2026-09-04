@@ -740,6 +740,10 @@ function initGame(){
   pumpVel = 0;
   missMarker = null;
   webThrow = null;
+  // clave del bug de "aparecen todos los enemigos de entrada": progressM nunca
+  // se reseteaba acá, así que una partida nueva heredaba el progreso (y por lo
+  // tanto la dificultad ya avanzada) de la mejor/última corrida de la sesión
+  progressM = 0;
 
   if (!stats.skinsUsed.includes(SKINS[selectedSkin].id)){
     stats.skinsUsed.push(SKINS[selectedSkin].id);
