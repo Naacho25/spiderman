@@ -555,6 +555,8 @@ let soloCharacter = 'spiderman'; // 'spiderman' | 'torch'
 const SOLO_TORCH_BASE_SPEED = 2.4;     // velocidad de avance automático al arrancar
 const SOLO_TORCH_MAX_SPEED = 6.2;      // tope para que no se vuelva injugable
 const SOLO_TORCH_SPEED_GROWTH = 0.0018; // cuánto acelera por cada metro de progreso (progressM)
+const TORCH_BOOST_SPEED = 7.5;   // velocidad extra hacia adelante mientras dura el propulsor
+const TORCH_BOOST_DURATION = 100; // frames que dura el propulsor si no lo cortás antes (~1.7s)
 
 let groundY, cameraX, buildings, powerUps, enemies, climbers, sandHands, rhinos, scorpions, poisonBolts, helicopters, webShots, player, web, keys, score, best = 0, running = false, gameOver = false;
 // vida callejera decorativa (no interfiere con la jugabilidad): árboles, gente paseando, autos
@@ -930,7 +932,7 @@ function initGame(){
     x: first.x + first.width/2 + 70, y: groundY - first.height - 60,
     px: 0, py: 0, radius: 14, alive: true, energy: TORCH_MAX_ENERGY,
     extraLives: 0, autoShoot: false, autoShootTimer: 0, shootCooldown: 0, facing: 1,
-    angle: 0, velSmoothX: 0, velSmoothY: 0
+    angle: 0, velSmoothX: 0, velSmoothY: 0, boosting: false, boostTimer: 0
   };
   torch.px = torch.x; torch.py = torch.y;
   torchImpulsePending = false;
@@ -1196,11 +1198,15 @@ function applyPowerUp(type, who){
       player.py = player.y + 19;
     }
     if ((twoPlayerMode || (!twoPlayerMode && soloCharacter === 'torch')) && torch.alive){
-      torch.py = torch.y + 19;
+      // para la Antorcha no es un salto hacia arriba como para Spiderman: es un
+      // propulsor que la hace avanzar varios metros para adelante sola, hasta
+      // que se acaba solo o el jugador lo corta apretando el impulso (Espacio/toque)
+      torch.boosting = true;
+      torch.boostTimer = TORCH_BOOST_DURATION;
       torch.energy = Math.min(TORCH_MAX_ENERGY, torch.energy + 30);
       updateTorchEnergyHud();
     }
-    pickupMsg = { text: '¡Súper salto! 🚀', timer: 70 };
+    pickupMsg = { text: '¡Súper salto! 🚀 (propulsor para la Antorcha)', timer: 70 };
     return;
   }
   if (who === 'p1'){
@@ -1847,7 +1853,12 @@ function update(){
 
     if (torchImpulsePending){
       torchImpulsePending = false;
-      if (torch.energy > 0){
+      if (torch.boosting){
+        // mientras el propulsor del power-up está activo, el toque/Espacio no
+        // hace el impulso normal: corta el propulsor antes de tiempo
+        torch.boosting = false;
+        torch.boostTimer = 0;
+      } else if (torch.energy > 0){
         // el impulso es SIEMPRE mayormente vertical (para arriba); si en el
         // momento de apretar Espacio hay una flecha izq/der apretada, se le
         // suma una leve orientación horizontal hacia ese lado — las flechas
@@ -1879,6 +1890,14 @@ function update(){
       // (arriba), no con un desplazamiento continuo mientras las mantenés.
       torchCruiseSpeed += (lastPlayerVX - torchCruiseSpeed) * 0.05;
       drift = torchCruiseSpeed;
+    }
+    if (torch.boosting){
+      // propulsor del power-up de súper salto: empuje extra hacia adelante,
+      // se corta solo al agotarse el tiempo o antes si el jugador impulsa
+      drift += TORCH_BOOST_SPEED;
+      torch.boostTimer--;
+      if (torch.boostTimer <= 0) torch.boosting = false;
+      torch.flameFX = Math.max(torch.flameFX, 10); // llamarada visible mientras dura
     }
     // se aplica como desplazamiento directo (no como "velocidad" del sistema
     // verlet), para que no se lea como impulso extra y se acumule frame a frame.
